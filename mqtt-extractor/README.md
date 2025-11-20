@@ -1,6 +1,6 @@
-# MQTT to Cognite Data Fusion Extractor - Home Assistant OS Add-on
+# MQTT to Cognite Data Fusion Extractor
 
-This Home Assistant OS add-on extracts MQTT messages and pushes them to Cognite Data Fusion (CDF) as time series data points.
+Home Assistant add-on that extracts MQTT messages and pushes them to Cognite Data Fusion (CDF) as time series data points.
 
 ## Features
 
