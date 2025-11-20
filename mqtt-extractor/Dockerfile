@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+ARG BUILD_FROM
+FROM ${BUILD_FROM:-python:3.11-slim}
 
 # Set working directory
 WORKDIR /app
