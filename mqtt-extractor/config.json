@@ -60,7 +60,7 @@
     "source_system_version": "str?",
     "log_level": "match(^(DEBUG|INFO|WARNING|ERROR)$)?"
   },
-  "image": "mqtt-extractor-{arch}",
+  "image": "local/mqtt-extractor-{arch}",
   "ports": {},
   "ports_description": {},
   "host_network": false
