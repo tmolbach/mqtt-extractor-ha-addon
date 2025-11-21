@@ -143,6 +143,6 @@ else
     bashio::log.info "Data Model: DISABLED"
 fi
 
-# Run the extractor
-exec python /app/extractor.py "$CONFIG_FILE"
+# Run the extractor (use python3 from venv which is in PATH)
+exec python3 /app/extractor.py "$CONFIG_FILE"
 

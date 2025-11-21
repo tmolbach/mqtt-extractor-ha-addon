@@ -27,8 +27,8 @@ COPY mqtt_extractor ./mqtt_extractor
 
 # Copy entrypoint script
 COPY run.sh /run.sh
-RUN chmod +x /run.sh
+RUN chmod a+x /run.sh
 
-# Set entrypoint
+# Set entrypoint (use sh to ensure proper execution)
 ENTRYPOINT ["/run.sh"]
 
