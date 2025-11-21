@@ -12,7 +12,6 @@
   "schema": {
     "message": "str?"
   },
-  "image": "local/hello-world-{arch}",
   "ports": {},
   "ports_description": {},
   "host_network": false
