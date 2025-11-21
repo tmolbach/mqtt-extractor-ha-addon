@@ -1,0 +1,20 @@
+{
+  "name": "Hello World Test Add-on",
+  "version": "1.0.0",
+  "slug": "hello-world",
+  "description": "Simple Hello World add-on to test Home Assistant add-on structure",
+  "arch": ["amd64", "aarch64", "armv7"],
+  "startup": "application",
+  "boot": "auto",
+  "options": {
+    "message": "Hello World from Home Assistant!"
+  },
+  "schema": {
+    "message": "str?"
+  },
+  "image": "local/hello-world-{arch}",
+  "ports": {},
+  "ports_description": {},
+  "host_network": false
+}
+
