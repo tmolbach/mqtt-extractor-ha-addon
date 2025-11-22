@@ -1,11 +1,12 @@
 {
   "name": "MQTT to Cognite Data Fusion Extractor",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "slug": "mqtt-extractor",
   "description": "Extracts MQTT messages and pushes them to Cognite Data Fusion (CDF)",
   "arch": ["amd64", "aarch64", "armv7"],
   "startup": "application",
   "boot": "auto",
+  "init": false,
   "options": {
     "mqtt_hostname": "homeassistant.local",
     "mqtt_port": 1883,

@@ -1,11 +1,12 @@
 {
   "name": "Hello World Test Add-on",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "slug": "hello-world",
   "description": "Simple Hello World add-on to test Home Assistant add-on structure",
   "arch": ["amd64", "aarch64", "armv7"],
   "startup": "application",
   "boot": "auto",
+  "init": false,
   "options": {
     "message": "Hello World from Home Assistant!"
   },
