@@ -1,6 +1,9 @@
 #!/usr/bin/with-contenv bashio
 set -e
 
+# Wait for s6 to be ready
+sleep 1
+
 # Read configuration from Home Assistant options
 CONFIG_FILE="/data/config.yaml"
 
@@ -8,7 +11,7 @@ CONFIG_FILE="/data/config.yaml"
 get_config() {
     local key=$1
     local default=$2
-    local value=$(bashio::config "${key}")
+    local value=$(bashio::config "${key}" 2>/dev/null || echo "")
     if [ -z "${value}" ]; then
         echo "${default}"
     else
@@ -16,25 +19,25 @@ get_config() {
     fi
 }
 
-# Get MQTT configuration
-MQTT_HOSTNAME=$(bashio::config 'mqtt_hostname')
-MQTT_PORT=$(bashio::config 'mqtt_port')
+# Get MQTT configuration (with error handling)
+MQTT_HOSTNAME=$(bashio::config 'mqtt_hostname' 2>/dev/null || echo "homeassistant.local")
+MQTT_PORT=$(bashio::config 'mqtt_port' 2>/dev/null || echo "1883")
 MQTT_USERNAME=$(get_config 'mqtt_username' '')
 MQTT_PASSWORD=$(get_config 'mqtt_password' '')
 MQTT_CLIENT_ID=$(get_config 'mqtt_client_id' 'mqtt-extractor')
 MQTT_CLEAN_SESSION=$(get_config 'mqtt_clean_session' 'false')
 
 # Get MQTT topics (can be array or comma-separated string)
-MQTT_TOPICS=$(bashio::config 'mqtt_topics')
+MQTT_TOPICS=$(bashio::config 'mqtt_topics' 2>/dev/null || echo '["*"]')
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
-# Get CDF configuration
-CDF_URL=$(bashio::config 'cdf_url')
-CDF_PROJECT=$(bashio::config 'cdf_project')
-IDP_CLIENT_ID=$(bashio::config 'idp_client_id')
-IDP_TOKEN_URL=$(bashio::config 'idp_token_url')
-IDP_CLIENT_SECRET=$(bashio::config 'idp_client_secret')
-IDP_SCOPES=$(bashio::config 'idp_scopes')
+# Get CDF configuration (with error handling)
+CDF_URL=$(bashio::config 'cdf_url' 2>/dev/null || echo "")
+CDF_PROJECT=$(bashio::config 'cdf_project' 2>/dev/null || echo "")
+IDP_CLIENT_ID=$(bashio::config 'idp_client_id' 2>/dev/null || echo "")
+IDP_TOKEN_URL=$(bashio::config 'idp_token_url' 2>/dev/null || echo "")
+IDP_CLIENT_SECRET=$(bashio::config 'idp_client_secret' 2>/dev/null || echo "")
+IDP_SCOPES=$(bashio::config 'idp_scopes' 2>/dev/null || echo "")
 
 # Get other configuration
 UPLOAD_INTERVAL=$(get_config 'upload_interval' '1')
@@ -133,14 +136,14 @@ EOF
 fi
 
 # Log configuration (without sensitive data)
-bashio::log.info "MQTT Extractor starting..."
-bashio::log.info "MQTT Broker: ${MQTT_HOSTNAME}:${MQTT_PORT}"
-bashio::log.info "Topics: ${MQTT_TOPICS}"
-bashio::log.info "CDF Project: ${CDF_PROJECT}"
+bashio::log.info "MQTT Extractor starting..." 2>/dev/null || echo "MQTT Extractor starting..."
+bashio::log.info "MQTT Broker: ${MQTT_HOSTNAME}:${MQTT_PORT}" 2>/dev/null || echo "MQTT Broker: ${MQTT_HOSTNAME}:${MQTT_PORT}"
+bashio::log.info "Topics: ${MQTT_TOPICS}" 2>/dev/null || echo "Topics: ${MQTT_TOPICS}"
+bashio::log.info "CDF Project: ${CDF_PROJECT}" 2>/dev/null || echo "CDF Project: ${CDF_PROJECT}"
 if [ "${ENABLE_DATA_MODEL}" = "true" ]; then
-    bashio::log.info "Data Model: ENABLED (Instance Space: ${INSTANCE_SPACE})"
+    bashio::log.info "Data Model: ENABLED (Instance Space: ${INSTANCE_SPACE})" 2>/dev/null || echo "Data Model: ENABLED (Instance Space: ${INSTANCE_SPACE})"
 else
-    bashio::log.info "Data Model: DISABLED"
+    bashio::log.info "Data Model: DISABLED" 2>/dev/null || echo "Data Model: DISABLED"
 fi
 
 # Run the extractor (use python3 from venv which is in PATH)
