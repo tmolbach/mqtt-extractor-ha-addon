@@ -111,8 +111,14 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
     echo "${MQTT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | sed 's/,/\n/g' | while read -r topic; do
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # Trim whitespace
         if [ -n "${topic}" ]; then
+            # Use single quotes for wildcard characters to avoid YAML parsing issues
+            if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+                topic_quote="'${topic}'"
+            else
+                topic_quote="\"${topic}\""
+            fi
             cat >> "$CONFIG_FILE" <<EOF
-  - topic: "${topic}"
+  - topic: ${topic_quote}
     qos: ${MQTT_QOS}
     handler:
       module: mqtt_extractor.simple
@@ -125,8 +131,14 @@ else
     for topic in "${TOPIC_ARRAY[@]}"; do
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # Trim whitespace
         if [ -n "${topic}" ]; then
+            # Use single quotes for wildcard characters to avoid YAML parsing issues
+            if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+                topic_quote="'${topic}'"
+            else
+                topic_quote="\"${topic}\""
+            fi
             cat >> "$CONFIG_FILE" <<EOF
-  - topic: "${topic}"
+  - topic: ${topic_quote}
     qos: ${MQTT_QOS}
     handler:
       module: mqtt_extractor.simple
