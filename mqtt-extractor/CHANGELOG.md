@@ -1,5 +1,8 @@
 ### Changelog
 
+**0.4.3** - 2025-11-23
+- Removed temporary debug logging for MQTT messages now that connectivity is verified
+
 **0.4.2** - 2025-11-23
 - Added INFO level logging for every received MQTT message to assist with debugging connectivity
 

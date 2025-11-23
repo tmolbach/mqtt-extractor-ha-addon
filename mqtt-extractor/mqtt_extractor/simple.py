@@ -17,9 +17,6 @@ def parse(payload: bytes, topic: str):
         # Decode bytes to string
         payload_str = payload.decode('utf-8').strip()
         
-        # Debug: Log every message at INFO level to verify connectivity
-        logger.info("Received message on %s: %s", topic, payload_str[:100])
-        
         if not payload_str:
             logger.debug("Skipping empty payload from topic %s", topic)
             return
