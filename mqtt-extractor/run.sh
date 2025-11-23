@@ -115,13 +115,15 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                # Use printf to write single-quoted wildcard to avoid YAML anchor issues
-                printf "  - topic: '%s'\n" "${topic}" >> "$CONFIG_FILE"
+                # Use quoted heredoc to ensure single quotes are preserved literally
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
                 printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
-                cat >> "$CONFIG_FILE" <<EOF
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
     handler:
       module: mqtt_extractor.simple
-EOF
+WILDCARD_EOF
             else
                 cat >> "$CONFIG_FILE" <<EOF
   - topic: "${topic}"
@@ -140,13 +142,15 @@ else
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                # Use printf to write single-quoted wildcard to avoid YAML anchor issues
-                printf "  - topic: '%s'\n" "${topic}" >> "$CONFIG_FILE"
+                # Use quoted heredoc to ensure single quotes are preserved literally
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
                 printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
-                cat >> "$CONFIG_FILE" <<EOF
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
     handler:
       module: mqtt_extractor.simple
-EOF
+WILDCARD_EOF
             else
                 cat >> "$CONFIG_FILE" <<EOF
   - topic: "${topic}"
@@ -244,10 +248,14 @@ if command -v bashio::log.info >/dev/null 2>&1; then
     bashio::log.info "MQTT Extractor add-on version: ${VERSION}"
 fi
 
-# Debug: Print first few lines of generated config (without sensitive data) for troubleshooting
+# Debug: Print subscriptions section of generated config for troubleshooting
+echo "[DEBUG] Generated config subscriptions section:"
+sed -n '/^subscriptions:/,/^[^ ]/p' "$CONFIG_FILE" 2>/dev/null | head -10 | sed 's/password:.*/password: [REDACTED]/' | while read line; do
+    echo "[DEBUG] $line"
+done
 if command -v bashio::log.debug >/dev/null 2>&1; then
-    bashio::log.debug "Generated config preview (first 20 lines):"
-    head -20 "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | while read line; do
+    bashio::log.debug "Generated config subscriptions section:"
+    sed -n '/^subscriptions:/,/^[^ ]/p' "$CONFIG_FILE" 2>/dev/null | head -10 | sed 's/password:.*/password: [REDACTED]/' | while read line; do
         bashio::log.debug "$line"
     done
 fi

@@ -1,5 +1,9 @@
 ### Changelog
 
+**0.3.8** - 2025-11-23
+- Fixed YAML wildcard quoting by using quoted heredoc delimiter to preserve single quotes literally
+- Added debug output to show generated subscriptions section
+
 **0.3.7** - 2025-11-23
 - Fixed version printing during startup by copying config.json and using BUILD_VERSION env var
 - Changed changelog header formatting to use ### instead of #
