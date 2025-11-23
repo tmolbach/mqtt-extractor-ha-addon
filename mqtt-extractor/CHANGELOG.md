@@ -1,5 +1,8 @@
 ### Changelog
 
+**0.3.9** - 2025-11-23
+- Improved debug output to show full config file for troubleshooting
+
 **0.3.8** - 2025-11-23
 - Fixed YAML wildcard quoting by using quoted heredoc delimiter to preserve single quotes literally
 - Added debug output to show generated subscriptions section
