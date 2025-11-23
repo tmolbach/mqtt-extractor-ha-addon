@@ -1,6 +1,6 @@
 {
   "name": "Hello World Test Add-on",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "slug": "hello-world",
   "description": "Simple Hello World add-on to test Home Assistant add-on structure",
   "arch": ["amd64", "aarch64", "armv7"],
