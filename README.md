@@ -1,9 +1,27 @@
-# MQTT to Cognite Data Fusion Extractor
+# Home Assistant Add-ons Repository
+
+This repository contains Home Assistant add-ons for integrating with Cognite Data Fusion and testing add-on functionality.
+
+## Add-ons
+
+### 🧪 Hello World Test Add-on
+
+A simple test add-on to validate Home Assistant add-on structure and installation flow. This add-on serves as a minimal example to test repository structure, Dockerfile build process, configuration schema, and add-on installation.
+
+**Features:**
+- Minimal test add-on for validation
+- Prints customizable messages
+- Validates add-on structure
+
+**Documentation:** See [`hello-world/README.md`](hello-world/README.md) for details.
+
+---
+
+### 📡 MQTT to Cognite Data Fusion Extractor
 
 Home Assistant add-on that extracts MQTT messages and pushes them to Cognite Data Fusion (CDF) as time series data points.
 
-## Features
-
+**Features:**
 - **MQTT Integration**: Connects to any MQTT broker (including Home Assistant's built-in MQTT broker)
 - **Cognite Data Fusion**: Pushes time series data to CDF with automatic time series creation
 - **Data Model Support**: Optional integration with Cognite Data Model for structured time series management
@@ -11,62 +29,63 @@ Home Assistant add-on that extracts MQTT messages and pushes them to Cognite Dat
 - **Automatic Type Detection**: Detects numeric, string, and JSON data types from MQTT payloads
 - **Home Assistant Integration**: Native HA add-on with UI configuration
 
+**Documentation:** See [`mqtt-extractor/README.md`](mqtt-extractor/README.md) for full documentation, configuration options, and troubleshooting.
+
+---
+
 ## Installation
 
-### Step 1: Prepare the Add-on Repository
-
-1. **Copy the add-on folder to your Home Assistant OS system:**
-
-   If you're using Home Assistant OS in VirtualBox, you'll need to transfer the `mqtt-extractor` folder to your Home Assistant system. You can do this via:
-
-   - **Samba Share** (easiest): Enable Samba in Home Assistant (Settings → Add-ons → Samba share), then copy the folder to `/config/addons/`
-   - **SSH**: Use SSH add-on to transfer files via `scp` or `rsync`
-   - **USB Drive**: Mount a USB drive and copy files
-
-2. **Create the add-on directory structure:**
-
-   On your Home Assistant OS system, create the following structure:
-   ```
-   /config/addons/mqtt-extractor/
-   ├── config.json
-   ├── Dockerfile
-   ├── run.sh
-   ├── requirements.txt
-   ├── extractor.py
-   └── mqtt_extractor/
-       ├── __init__.py
-       ├── main.py
-       ├── cdf.py
-       ├── simple.py
-       └── metrics.py
-   ```
-
-### Step 2: Install via Home Assistant UI
+### Add Repository to Home Assistant
 
 1. **Open Home Assistant** and navigate to **Settings → Add-ons → Add-on Store**
 2. Click the **three dots menu** (⋮) in the top right corner
 3. Select **Repositories**
-4. Click **Add** and enter your repository path (if using a custom repository) or use **Local add-ons**
-5. The add-on should appear in your add-on store
-6. Click **Install** and wait for the installation to complete
+4. Click **Add** and enter: `https://github.com/tmolbach/mqtt-extractor-ha-addon`
+5. Click **Add** to save the repository
 
-### Step 3: Configure the Add-on
+### Install Add-ons
 
-1. **Navigate to the add-on** in Settings → Add-ons
-2. Click **Configuration** tab
-3. Fill in the required configuration (see Configuration section below)
-4. Click **Save**
+After adding the repository, both add-ons will appear in your add-on store:
 
-### Step 4: Start the Add-on
+- **Hello World Test Add-on** - For testing and validation
+- **MQTT to Cognite Data Fusion Extractor** - For MQTT to CDF integration
 
-1. Go to the **Info** tab
-2. Toggle the **Start on boot** switch if you want it to start automatically
-3. Click **Start** to launch the add-on
-4. Check the **Log** tab to verify it's running correctly
+Click **Install** on any add-on you want to use, then configure and start it.
 
-## Configuration
+## Repository Structure
 
-The add-on can be configured entirely through the Home Assistant UI. Here's what each option means:
+```
+.
+├── README.md              # This file
+├── repository.yaml        # Home Assistant repository configuration
+├── hello-world/           # Hello World test addon
+│   ├── config.json
+│   ├── Dockerfile
+│   ├── README.md
+│   └── run.sh
+└── mqtt-extractor/        # MQTT to CDF extractor addon
+    ├── config.json
+    ├── Dockerfile
+    ├── extractor.py
+    ├── README.md
+    ├── requirements.txt
+    ├── run.sh
+    └── mqtt_extractor/
+        └── ...
+```
+
+## Quick Start
+
+### Installing the MQTT Extractor Add-on
+
+1. **Add the repository** (see Installation section above)
+2. **Install** the "MQTT to Cognite Data Fusion Extractor" add-on
+3. **Configure** MQTT and CDF settings in the add-on configuration
+4. **Start** the add-on and check logs to verify it's running
+
+## MQTT Extractor Configuration
+
+The MQTT Extractor add-on can be configured entirely through the Home Assistant UI. Here's what each option means:
 
 ### MQTT Configuration
 
@@ -181,9 +200,9 @@ The add-on can be configured entirely through the Home Assistant UI. Here's what
 }
 ```
 
-## Testing
+## Testing the MQTT Extractor
 
-### 1. Verify MQTT Connection
+### Verify MQTT Connection
 
 1. Check the add-on logs (Settings → Add-ons → mqtt-extractor → Log)
 2. Look for: `Connected to <hostname>:<port> (<n> subscriptions)`
@@ -192,9 +211,7 @@ The add-on can be configured entirely through the Home Assistant UI. Here's what
    - MQTT credentials (if required) are correct
    - Network connectivity to the MQTT broker
 
-### 2. Test MQTT Message Publishing
-
-You can test by publishing a message to your MQTT broker:
+### Test MQTT Message Publishing
 
 **Using Home Assistant Developer Tools:**
 1. Go to Developer Tools → MQTT
@@ -208,24 +225,16 @@ You can test by publishing a message to your MQTT broker:
 mosquitto_pub -h homeassistant.local -p 1883 -t "test/sensor/temperature" -m "22.5"
 ```
 
-### 3. Verify Data in Cognite Data Fusion
+### Verify Data in Cognite Data Fusion
 
 1. Log in to your CDF project
 2. Navigate to **Time Series** → **Browse**
 3. Search for time series with external ID starting with your prefix (e.g., `mqtt:test_sensor_temperature`)
 4. Check that data points are being uploaded
 
-### 4. Check Add-on Logs
-
-Monitor the logs for:
-- Connection status messages
-- Message processing statistics
-- Error messages
-- Data point upload confirmations
-
 ## Troubleshooting
 
-### Add-on Won't Start
+### MQTT Extractor Add-on Won't Start
 
 1. **Check Logs**: Go to the Log tab and look for error messages
 2. **Verify Configuration**: Ensure all required fields are filled in
@@ -317,9 +326,13 @@ The configuration is stored in `/data/config.yaml` inside the add-on container. 
 ## Support
 
 For issues related to:
-- **Home Assistant OS**: Check Home Assistant documentation
-- **Cognite Data Fusion**: Check CDF documentation
-- **MQTT**: Check MQTT broker documentation
+- **Home Assistant OS**: Check [Home Assistant documentation](https://www.home-assistant.io/docs/)
+- **Cognite Data Fusion**: Check [CDF documentation](https://docs.cognite.com/)
+- **MQTT**: Check your MQTT broker documentation
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
