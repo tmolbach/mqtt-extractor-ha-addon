@@ -113,16 +113,23 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                topic_quote="'${topic}'"
+                # Use quoted heredoc to preserve single quotes literally
+                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+  - topic: '*'
+HEREDOC_EOF
+                echo "    qos: ${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+    handler:
+      module: mqtt_extractor.simple
+HEREDOC_EOF
             else
-                topic_quote="\"${topic}\""
-            fi
-            cat >> "$CONFIG_FILE" <<EOF
-  - topic: ${topic_quote}
+                cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
     qos: ${MQTT_QOS}
     handler:
       module: mqtt_extractor.simple
 EOF
+            fi
         fi
     done
 else
@@ -133,16 +140,23 @@ else
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                topic_quote="'${topic}'"
+                # Use quoted heredoc to preserve single quotes literally
+                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+  - topic: '*'
+HEREDOC_EOF
+                echo "    qos: ${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+    handler:
+      module: mqtt_extractor.simple
+HEREDOC_EOF
             else
-                topic_quote="\"${topic}\""
-            fi
-            cat >> "$CONFIG_FILE" <<EOF
-  - topic: ${topic_quote}
+                cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
     qos: ${MQTT_QOS}
     handler:
       module: mqtt_extractor.simple
 EOF
+            fi
         fi
     done
 fi
