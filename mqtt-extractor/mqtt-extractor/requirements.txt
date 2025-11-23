@@ -1,0 +1,5 @@
+cognite-extractor-utils>=7.0.0
+paho-mqtt>=1.5.1
+python-dotenv>=1.0.0
+prometheus-client>=0.18.0
+
