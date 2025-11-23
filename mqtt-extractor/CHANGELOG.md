@@ -1,5 +1,10 @@
 ### Changelog
 
+**0.4.0** - 2025-11-23
+- Fixed issue where only first topic was written when multiple topics configured
+- Changed topic parsing to use array-based approach instead of pipe to avoid subshell issues
+- Added debug output to show parsed topics
+
 **0.3.9** - 2025-11-23
 - Improved debug output to show full config file for troubleshooting
 

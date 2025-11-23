@@ -55,6 +55,9 @@ else
 fi
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
+# Debug: Print raw topics value
+echo "[DEBUG] Raw MQTT_TOPICS value: ${MQTT_TOPICS}"
+
 # Progress indicator: Reading CDF configuration
 echo "[Startup 40%] Reading CDF configuration..."
 
@@ -109,29 +112,40 @@ EOF
 # Home Assistant passes arrays as JSON arrays, so we need to parse them
 if echo "${MQTT_TOPICS}" | grep -q '^\['; then
     # Array format: ["topic1", "topic2"] or ["topic1","topic2"]
-    # Extract topics using sed/awk, handling both formats
-    echo "${MQTT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | sed 's/,/\n/g' | while read -r topic; do
+    # Extract topics into an array to avoid subshell issues
+    TOPIC_ARRAY=()
+    # Parse JSON array: remove brackets and quotes, split by comma
+    PARSED_TOPICS=$(echo "${MQTT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g')
+    # Split by comma and add to array
+    IFS=',' read -ra TEMP_ARRAY <<< "${PARSED_TOPICS}"
+    for topic in "${TEMP_ARRAY[@]}"; do
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # Trim whitespace
         if [ -n "${topic}" ]; then
-            # Use single quotes for wildcard characters to avoid YAML parsing issues
-            if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                # Use quoted heredoc to ensure single quotes are preserved literally
-                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+            TOPIC_ARRAY+=("${topic}")
+            echo "[DEBUG] Parsed topic: '${topic}'"
+        fi
+    done
+    # Write topics to config file
+    echo "[DEBUG] Writing ${#TOPIC_ARRAY[@]} topic(s) to config file"
+    for topic in "${TOPIC_ARRAY[@]}"; do
+        # Use single quotes for wildcard characters to avoid YAML parsing issues
+        if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+            # Use quoted heredoc to ensure single quotes are preserved literally
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
   - topic: '*'
 WILDCARD_EOF
-                printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
-                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+            printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
     handler:
       module: mqtt_extractor.simple
 WILDCARD_EOF
-            else
-                cat >> "$CONFIG_FILE" <<EOF
+        else
+            cat >> "$CONFIG_FILE" <<EOF
   - topic: "${topic}"
     qos: ${MQTT_QOS}
     handler:
       module: mqtt_extractor.simple
 EOF
-            fi
         fi
     done
 else
