@@ -248,14 +248,14 @@ if command -v bashio::log.info >/dev/null 2>&1; then
     bashio::log.info "MQTT Extractor add-on version: ${VERSION}"
 fi
 
-# Debug: Print subscriptions section of generated config for troubleshooting
-echo "[DEBUG] Generated config subscriptions section:"
-sed -n '/^subscriptions:/,/^[^ ]/p' "$CONFIG_FILE" 2>/dev/null | head -10 | sed 's/password:.*/password: [REDACTED]/' | while read line; do
+# Debug: Print full config file for troubleshooting (with sensitive data redacted)
+echo "[DEBUG] Full generated config file:"
+cat "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | sed 's/secret:.*/secret: [REDACTED]/' | sed 's/client-secret:.*/client-secret: [REDACTED]/' | while read line; do
     echo "[DEBUG] $line"
 done
 if command -v bashio::log.debug >/dev/null 2>&1; then
-    bashio::log.debug "Generated config subscriptions section:"
-    sed -n '/^subscriptions:/,/^[^ ]/p' "$CONFIG_FILE" 2>/dev/null | head -10 | sed 's/password:.*/password: [REDACTED]/' | while read line; do
+    bashio::log.debug "Full generated config file:"
+    cat "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | sed 's/secret:.*/secret: [REDACTED]/' | sed 's/client-secret:.*/client-secret: [REDACTED]/' | while read line; do
         bashio::log.debug "$line"
     done
 fi
