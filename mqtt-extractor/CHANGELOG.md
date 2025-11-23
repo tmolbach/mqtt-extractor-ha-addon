@@ -1,5 +1,9 @@
 ### Changelog
 
+**0.4.1** - 2025-11-23
+- Fixed YAML parsing error by quoting configuration values (like external-id-prefix)
+- Improved topic parsing to correctly handle newline-separated topics from UI input
+
 **0.4.0** - 2025-11-23
 - Fixed issue where only first topic was written when multiple topics configured
 - Changed topic parsing to use array-based approach instead of pipe to avoid subshell issues

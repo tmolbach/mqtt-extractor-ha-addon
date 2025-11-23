@@ -114,8 +114,8 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
     # Array format: ["topic1", "topic2"] or ["topic1","topic2"]
     # Extract topics into an array to avoid subshell issues
     TOPIC_ARRAY=()
-    # Parse JSON array: remove brackets and quotes, split by comma
-    PARSED_TOPICS=$(echo "${MQTT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g')
+    # Parse JSON array: remove brackets and quotes, replace newlines with comma
+    PARSED_TOPICS=$(echo "${MQTT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr '\n' ',')
     # Split by comma and add to array
     IFS=',' read -ra TEMP_ARRAY <<< "${PARSED_TOPICS}"
     for topic in "${TEMP_ARRAY[@]}"; do
@@ -150,7 +150,9 @@ EOF
     done
 else
     # Comma-separated or single topic (fallback for manual configuration)
-    IFS=',' read -ra TOPIC_ARRAY <<< "${MQTT_TOPICS}"
+    # Handle both comma and newline separated topics
+    PARSED_TOPICS=$(echo "${MQTT_TOPICS}" | tr '\n' ',')
+    IFS=',' read -ra TOPIC_ARRAY <<< "${PARSED_TOPICS}"
     for topic in "${TOPIC_ARRAY[@]}"; do
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # Trim whitespace
         if [ -n "${topic}" ]; then
@@ -181,7 +183,7 @@ fi
 cat >> "$CONFIG_FILE" <<EOF
 
 upload-interval: ${UPLOAD_INTERVAL}
-external-id-prefix: ${EXTERNAL_ID_PREFIX}
+external-id-prefix: "${EXTERNAL_ID_PREFIX}"
 create-missing: ${CREATE_MISSING}
 
 logger:
@@ -189,14 +191,14 @@ logger:
     level: ${LOG_LEVEL}
 
 cognite:
-  host: ${CDF_URL}
-  project: ${CDF_PROJECT}
+  host: "${CDF_URL}"
+  project: "${CDF_PROJECT}"
   idp-authentication:
-    client-id: ${IDP_CLIENT_ID}
-    token-url: ${IDP_TOKEN_URL}
-    secret: ${IDP_CLIENT_SECRET}
+    client-id: "${IDP_CLIENT_ID}"
+    token-url: "${IDP_TOKEN_URL}"
+    secret: "${IDP_CLIENT_SECRET}"
     scopes:
-      - ${IDP_SCOPES}
+      - "${IDP_SCOPES}"
 EOF
 
 # Progress indicator: Adding data model configuration
@@ -206,12 +208,12 @@ if [ "${ENABLE_DATA_MODEL}" = "true" ] && [ -n "${INSTANCE_SPACE}" ]; then
     cat >> "$CONFIG_FILE" <<EOF
 
 target:
-  instance-space: ${INSTANCE_SPACE}
-  data-model-space: ${DATA_MODEL_SPACE}
-  data-model-version: ${DATA_MODEL_VERSION}
-  timeseries-view-external-id: ${TIMESERIES_VIEW}
-  source-system-space: ${SOURCE_SYSTEM_SPACE}
-  source-system-version: ${SOURCE_SYSTEM_VERSION}
+  instance-space: "${INSTANCE_SPACE}"
+  data-model-space: "${DATA_MODEL_SPACE}"
+  data-model-version: "${DATA_MODEL_VERSION}"
+  timeseries-view-external-id: "${TIMESERIES_VIEW}"
+  source-system-space: "${SOURCE_SYSTEM_SPACE}"
+  source-system-version: "${SOURCE_SYSTEM_VERSION}"
 EOF
     echo "[Startup 75%] Data model configuration added"
 else
