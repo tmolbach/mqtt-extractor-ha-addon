@@ -92,6 +92,8 @@ SOURCE_SYSTEM_VERSION=$(get_config 'source_system_version' 'v1')
 
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
+version: 1
+
 mqtt:
   hostname: ${MQTT_HOSTNAME}
   port: ${MQTT_PORT}
@@ -113,15 +115,13 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                # Use quoted heredoc to preserve single quotes literally
-                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
-  - topic: '*'
-HEREDOC_EOF
-                echo "    qos: ${MQTT_QOS}" >> "$CONFIG_FILE"
-                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+                # Use printf to write single-quoted wildcard to avoid YAML anchor issues
+                printf "  - topic: '%s'\n" "${topic}" >> "$CONFIG_FILE"
+                printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<EOF
     handler:
       module: mqtt_extractor.simple
-HEREDOC_EOF
+EOF
             else
                 cat >> "$CONFIG_FILE" <<EOF
   - topic: "${topic}"
@@ -140,15 +140,13 @@ else
         if [ -n "${topic}" ]; then
             # Use single quotes for wildcard characters to avoid YAML parsing issues
             if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
-                # Use quoted heredoc to preserve single quotes literally
-                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
-  - topic: '*'
-HEREDOC_EOF
-                echo "    qos: ${MQTT_QOS}" >> "$CONFIG_FILE"
-                cat >> "$CONFIG_FILE" <<'HEREDOC_EOF'
+                # Use printf to write single-quoted wildcard to avoid YAML anchor issues
+                printf "  - topic: '%s'\n" "${topic}" >> "$CONFIG_FILE"
+                printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<EOF
     handler:
       module: mqtt_extractor.simple
-HEREDOC_EOF
+EOF
             else
                 cat >> "$CONFIG_FILE" <<EOF
   - topic: "${topic}"
@@ -231,6 +229,24 @@ fi
 # Progress indicator: Starting extractor
 echo "[Startup 90%] Starting MQTT Extractor..."
 echo "[Startup 95%] Loading Python environment and dependencies..."
+
+# Print version for verification
+if [ -f "/app/config.json" ]; then
+    ADDON_VERSION=$(grep -o '"version": "[^"]*"' /app/config.json 2>/dev/null | cut -d'"' -f4 || echo "unknown")
+    echo "[Startup 97%] MQTT Extractor add-on version: ${ADDON_VERSION}"
+    if command -v bashio::log.info >/dev/null 2>&1; then
+        bashio::log.info "MQTT Extractor add-on version: ${ADDON_VERSION}"
+    fi
+fi
+
+# Debug: Print first few lines of generated config (without sensitive data) for troubleshooting
+if command -v bashio::log.debug >/dev/null 2>&1; then
+    bashio::log.debug "Generated config preview (first 20 lines):"
+    head -20 "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | while read line; do
+        bashio::log.debug "$line"
+    done
+fi
+
 echo "[Startup 100%] MQTT Extractor add-on started successfully!"
 
 # Run the extractor (use python3 from venv which is in PATH)
