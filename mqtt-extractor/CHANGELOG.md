@@ -1,5 +1,8 @@
 ### Changelog
 
+**0.4.2** - 2025-11-23
+- Added INFO level logging for every received MQTT message to assist with debugging connectivity
+
 **0.4.1** - 2025-11-23
 - Fixed YAML parsing error by quoting configuration values (like external-id-prefix)
 - Improved topic parsing to correctly handle newline-separated topics from UI input
