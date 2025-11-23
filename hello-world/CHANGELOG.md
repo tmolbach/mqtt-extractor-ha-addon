@@ -1,4 +1,4 @@
-# Changelog
+### Changelog
 
 **1.0.7** - 2025-11-23
 - Changed changelog version headers to bold text for smaller font size

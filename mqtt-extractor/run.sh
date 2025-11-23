@@ -231,12 +231,17 @@ echo "[Startup 90%] Starting MQTT Extractor..."
 echo "[Startup 95%] Loading Python environment and dependencies..."
 
 # Print version for verification
-if [ -f "/app/config.json" ]; then
-    ADDON_VERSION=$(grep -o '"version": "[^"]*"' /app/config.json 2>/dev/null | cut -d'"' -f4 || echo "unknown")
-    echo "[Startup 97%] MQTT Extractor add-on version: ${ADDON_VERSION}"
-    if command -v bashio::log.info >/dev/null 2>&1; then
-        bashio::log.info "MQTT Extractor add-on version: ${ADDON_VERSION}"
-    fi
+# Try environment variable first (set from BUILD_VERSION), then config.json, then unknown
+if [ -n "${ADDON_VERSION}" ]; then
+    VERSION="${ADDON_VERSION}"
+elif [ -f "/app/config.json" ]; then
+    VERSION=$(grep -o '"version": "[^"]*"' /app/config.json 2>/dev/null | cut -d'"' -f4 || echo "unknown")
+else
+    VERSION="unknown"
+fi
+echo "[Startup 97%] MQTT Extractor add-on version: ${VERSION}"
+if command -v bashio::log.info >/dev/null 2>&1; then
+    bashio::log.info "MQTT Extractor add-on version: ${VERSION}"
 fi
 
 # Debug: Print first few lines of generated config (without sensitive data) for troubleshooting

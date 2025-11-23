@@ -1,4 +1,5 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
+ARG BUILD_VERSION
 FROM ${BUILD_FROM}
 
 # Progress indicator: Installing system dependencies
@@ -24,13 +25,15 @@ RUN echo "[25%] Installing Python dependencies (this may take a few minutes)..."
     /app/venv/bin/pip install --no-cache-dir -r requirements.txt && \
     echo "[50%] Python dependencies installed successfully"
 
-# Add venv to PATH
+# Add venv to PATH and set version
 ENV PATH="/app/venv/bin:$PATH"
+ENV ADDON_VERSION="${BUILD_VERSION}"
 
 # Progress indicator: Copying application code
 RUN echo "[60%] Copying application code..."
 COPY extractor.py .
 COPY mqtt_extractor ./mqtt_extractor
+COPY config.json /app/config.json
 RUN echo "[75%] Application code copied successfully"
 
 # Progress indicator: Setting up entrypoint
