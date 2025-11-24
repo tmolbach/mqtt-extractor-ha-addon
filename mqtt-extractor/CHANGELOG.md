@@ -1,5 +1,9 @@
 ### Changelog
 
+**0.4.7** - 2025-11-24
+- Promoted topic pattern matching to INFO level for better visibility
+- Promoted time series creation details to INFO level to track resource creation
+
 **0.4.6** - 2025-11-24
 - Improved logging levels across the codebase for better production use
 - Changed skipped message logging in simple handler from INFO to DEBUG

@@ -334,7 +334,7 @@ def create_timeseries_in_data_model(cdf_client: CogniteClient, config: Config, e
             }
         }
         
-        logger.debug("Creating time series in data model: %s (topic=%s, type=%s)", external_id, topic, data_type)
+        logger.info("Creating time series in data model: %s (topic=%s, type=%s)", external_id, topic, data_type)
         
         node = NodeApply(
             space=config.target.instance_space,
@@ -571,7 +571,7 @@ def main():
                         if mqtt_topic_matches(message.topic, pattern):
                             handle = handler
                             matched_pattern = pattern
-                            logger.debug("Matched topic %s to pattern %s", message.topic, pattern)
+                            logger.info("Matched topic %s to pattern %s", message.topic, pattern)
                             break
                     
                     if not handle:
@@ -615,7 +615,7 @@ def main():
                         # Ensure CogniteTimeSeries exists in data model
                         # Pass the value so we can detect its data type
                         if not check_timeseries_in_data_model(cdf_client, config, external_id):
-                            logger.debug("Creating time series for topic: %s", message.topic)
+                            logger.info("Creating time series for topic: %s", message.topic)
                             data_type = detect_data_type(value)
                             if create_timeseries_in_data_model(cdf_client, config, external_id, message.topic, data_type):
                                 logger.info("Created time series: %s (type=%s)", message.topic, data_type)
