@@ -50,8 +50,10 @@ echo "[Startup 30%] MQTT configuration loaded: ${MQTT_HOSTNAME}:${MQTT_PORT}"
 # Get MQTT topics (can be array or comma-separated string)
 if command -v bashio::config >/dev/null 2>&1; then
     MQTT_TOPICS=$(bashio::config 'mqtt_topics' 2>/dev/null || echo '["*"]')
+    MQTT_RAW_TOPICS=$(bashio::config 'mqtt_raw_topics' 2>/dev/null || echo '[]')
 else
     MQTT_TOPICS='["*"]'
+    MQTT_RAW_TOPICS='[]'
 fi
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
@@ -179,6 +181,70 @@ EOF
     done
 fi
 
+# Process raw topics - handle both array format and comma-separated string
+# Similar parsing logic as regular topics but assigns mqtt_extractor.raw handler
+if echo "${MQTT_RAW_TOPICS}" | grep -q '^\['; then
+    # Array format: ["topic1", "topic2"]
+    TOPIC_ARRAY=()
+    PARSED_TOPICS=$(echo "${MQTT_RAW_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr '\n' ',')
+    IFS=',' read -ra TEMP_ARRAY <<< "${PARSED_TOPICS}"
+    for topic in "${TEMP_ARRAY[@]}"; do
+        topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -n "${topic}" ]; then
+            TOPIC_ARRAY+=("${topic}")
+            echo "[DEBUG] Parsed raw topic: '${topic}'"
+        fi
+    done
+    # Write raw topics to config file
+    echo "[DEBUG] Writing ${#TOPIC_ARRAY[@]} raw topic(s) to config file"
+    for topic in "${TOPIC_ARRAY[@]}"; do
+        # Use single quotes for wildcard characters
+        if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
+            printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+    handler:
+      module: mqtt_extractor.raw
+WILDCARD_EOF
+        else
+            cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.raw
+EOF
+        fi
+    done
+else
+    # Comma-separated or single topic
+    PARSED_TOPICS=$(echo "${MQTT_RAW_TOPICS}" | tr '\n' ',')
+    IFS=',' read -ra TOPIC_ARRAY <<< "${PARSED_TOPICS}"
+    for topic in "${TOPIC_ARRAY[@]}"; do
+        topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -n "${topic}" ]; then
+            if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
+                printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+    handler:
+      module: mqtt_extractor.raw
+WILDCARD_EOF
+            else
+                cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.raw
+EOF
+            fi
+        fi
+    done
+fi
+
 # Add remaining configuration
 cat >> "$CONFIG_FILE" <<EOF
 
@@ -228,6 +294,9 @@ if command -v bashio::log.info >/dev/null 2>&1; then
     bashio::log.info "MQTT Extractor starting..."
     bashio::log.info "MQTT Broker: ${MQTT_HOSTNAME}:${MQTT_PORT}"
     bashio::log.info "Topics: ${MQTT_TOPICS}"
+    if [ "${MQTT_RAW_TOPICS}" != "[]" ] && [ -n "${MQTT_RAW_TOPICS}" ]; then
+        bashio::log.info "Raw Topics: ${MQTT_RAW_TOPICS}"
+    fi
     bashio::log.info "CDF Project: ${CDF_PROJECT}"
     if [ "${ENABLE_DATA_MODEL}" = "true" ]; then
         bashio::log.info "Data Model: ENABLED (Instance Space: ${INSTANCE_SPACE})"
@@ -238,6 +307,9 @@ else
     echo "MQTT Extractor starting..."
     echo "MQTT Broker: ${MQTT_HOSTNAME}:${MQTT_PORT}"
     echo "Topics: ${MQTT_TOPICS}"
+    if [ "${MQTT_RAW_TOPICS}" != "[]" ] && [ -n "${MQTT_RAW_TOPICS}" ]; then
+        echo "Raw Topics: ${MQTT_RAW_TOPICS}"
+    fi
     echo "CDF Project: ${CDF_PROJECT}"
     if [ "${ENABLE_DATA_MODEL}" = "true" ]; then
         echo "Data Model: ENABLED (Instance Space: ${INSTANCE_SPACE})"

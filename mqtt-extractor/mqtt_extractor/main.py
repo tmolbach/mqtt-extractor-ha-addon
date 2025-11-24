@@ -1,3 +1,4 @@
+import inspect
 import importlib
 import io
 import logging
@@ -583,7 +584,16 @@ def main():
                 # Track if we got any datapoints from the handler
                 datapoints_from_message = 0
                     
-                for ts_id, time_stamp, value in handle(message.payload, message.topic):
+                # Prepare arguments for the handler
+                handler_args = [message.payload, message.topic]
+                handler_kwargs = {}
+                
+                # Check if handler accepts client argument
+                sig = inspect.signature(handle)
+                if 'client' in sig.parameters:
+                    handler_kwargs['client'] = cdf_client
+                
+                for ts_id, time_stamp, value in handle(*handler_args, **handler_kwargs):
                     datapoints_from_message += 1
 
                     logger.debug("Datapoint: %s = %r @ %d", ts_id, value, time_stamp)

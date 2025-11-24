@@ -1,5 +1,11 @@
 ### Changelog
 
+**0.4.4** - 2025-11-24
+- Added `raw` handler support for writing MQTT messages directly to CDF Raw service
+- Added `mqtt_raw_topics` configuration option to specify topics for raw handling
+- Raw handler automatically provisions Databases and Tables in CDF based on topic structure (db/table)
+- Raw handler inserts JSON payloads as rows with auto-detected or provided keys
+
 **0.4.3** - 2025-11-23
 - Removed temporary debug logging for MQTT messages now that connectivity is verified
 

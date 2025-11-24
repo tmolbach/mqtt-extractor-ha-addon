@@ -1,6 +1,6 @@
 {
   "name": "MQTT to Cognite Data Fusion Extractor",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "slug": "mqtt-extractor",
   "description": "Extracts MQTT messages and pushes them to Cognite Data Fusion (CDF)",
   "arch": ["amd64", "aarch64", "armv7"],
@@ -15,6 +15,7 @@
     "mqtt_client_id": "mqtt-extractor",
     "mqtt_clean_session": false,
     "mqtt_topics": ["*"],
+    "mqtt_raw_topics": [],
     "mqtt_qos": 1,
     "cdf_url": "",
     "cdf_project": "",
@@ -42,6 +43,7 @@
     "mqtt_client_id": "str?",
     "mqtt_clean_session": "bool?",
     "mqtt_topics": ["str"],
+    "mqtt_raw_topics": ["str"],
     "mqtt_qos": "int(0,2)?",
     "cdf_url": "str",
     "cdf_project": "str",
