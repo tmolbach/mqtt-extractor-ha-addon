@@ -51,11 +51,17 @@ def ensure_db_table(client, db_name: str, table_name: str) -> bool:
         logger.error(f"Error ensuring Raw resources {db_name}.{table_name}: {e}")
         return False
 
-def parse(payload: bytes, topic: str, client: Any = None) -> Generator[Tuple[str, int, Union[int, float, str]], None, None]:
+def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: str = None) -> Generator[Tuple[str, int, Union[int, float, str]], None, None]:
     """
     Parse payload and write to Cognite Data Fusion Raw.
-    Topic structure expected: db_name/table_name/...
-    Payload expected: JSON object
+    Topic structure expected is relative to the subscription_topic (filter).
+    
+    If subscription_topic is "eastham/75_nsunkenmeadow/registry/#"
+    And topic is "eastham/75_nsunkenmeadow/registry/sites/site1"
+    
+    Database = registry (last part of base)
+    Table = sites (first part of suffix)
+    Row Key = site1 (rest of suffix or from payload)
     """
     if not client:
         logger.error("CDF Client not provided to raw handler")
@@ -83,61 +89,98 @@ def parse(payload: bytes, topic: str, client: Any = None) -> Generator[Tuple[str
             logger.debug("Payload is not a JSON object for topic %s, skipping", topic)
             return
 
-        # Parse Topic for DB, Table, and Key
-        # Example: registry/areas/living_room -> db=registry, table=areas, key=living_room
-        parts = topic.split('/')
-        
-        # We need at least db/table
-        if len(parts) < 2:
-            logger.warning("Topic %s too short to derive DB and Table names (needs db/table)", topic)
-            return
-        
-        db_name = parts[0]
-        table_name = parts[1]
-        
-        # Key generation strategy:
-        # 1. Use the last part of the topic if parts > 2
-        # 2. Or check for an 'id' or 'key' field in the payload
-        # 3. Fallback to a UUID or timestamp
-        
+        # Derive DB and Table names from topic and subscription_topic
+        db_name = None
+        table_name = None
         row_key = None
-        if len(parts) > 2:
-            row_key = parts[-1]
-        elif 'key' in data:
-            row_key = str(data['key'])
-        elif 'id' in data:
-            row_key = str(data['id'])
-        else:
-            # No key found in topic or payload
-            # For raw rows, we need a key. 
-            # If the user intends to just dump data, maybe we use a timestamp or uuid
-            import uuid
-            row_key = str(uuid.uuid4())
+        
+        # Strip wildcard from subscription topic to get the "base" path
+        # e.g. "eastham/75_nsunkenmeadow/registry/#" -> "eastham/75_nsunkenmeadow/registry"
+        base_path = ""
+        if subscription_topic:
+            if subscription_topic == "#" or subscription_topic == "*":
+                base_path = ""
+            elif subscription_topic.endswith("/#"):
+                base_path = subscription_topic[:-2]
+            elif subscription_topic.endswith("/+"):
+                 base_path = subscription_topic[:-2]
+            elif subscription_topic.endswith("+"):
+                 # Single + wildcard, strip it
+                 base_path = subscription_topic[:-1] if subscription_topic[-1:] == "+" else subscription_topic
+            else:
+                base_path = subscription_topic
+        
+        logger.debug(f"Raw handler - subscription: {subscription_topic}, base: {base_path}, topic: {topic}")
+        
+        # If we have a base path and the topic starts with it
+        if base_path and topic.startswith(base_path):
+             # DB is the last part of the base path
+             parts_base = base_path.split('/')
+             db_name = parts_base[-1] if parts_base else None
+             
+             # Remainder of the topic determines table and key
+             # topic: base/table/key...
+             # remainder: /table/key... or table/key...
+             remainder = topic[len(base_path):]
+             if remainder.startswith('/'):
+                 remainder = remainder[1:]
+             
+             parts_suffix = remainder.split('/') if remainder else []
+             
+             if len(parts_suffix) >= 1 and parts_suffix[0]:
+                 table_name = parts_suffix[0]
+                 
+                 if len(parts_suffix) > 1:
+                     # Use remaining parts as row key
+                     row_key = "/".join(parts_suffix[1:])
+             
+             logger.debug(f"Parsed from subscription: db={db_name}, table={table_name}, key={row_key}")
+        
+        # Fallback to old logic if pattern didn't match expectation or was just wildcard
+        if not db_name or not table_name:
+            parts = topic.split('/')
+            if len(parts) >= 2:
+                db_name = parts[0]
+                table_name = parts[1]
+                if len(parts) > 2:
+                    row_key = "/".join(parts[2:])
+                logger.debug(f"Parsed from topic fallback: db={db_name}, table={table_name}, key={row_key}")
+            else:
+                logger.warning("Topic %s too short to derive DB and Table names", topic)
+                return
+
+        # Sanitize DB and Table names (allow alphanumeric, underscore, dash)
+        # CDF Raw naming constraints are relatively strict
+        def sanitize(name):
+             return "".join(c for c in name if c.isalnum() or c in ('_', '-'))
+        
+        safe_db_name = sanitize(db_name)
+        safe_table_name = sanitize(table_name)
+        
+        if not safe_db_name or not safe_table_name:
+             logger.warning(f"Invalid characters in DB ({db_name}) or Table ({table_name}) derived from topic {topic}")
+             return
+
+        # Key generation fallback
+        if not row_key:
+            if 'key' in data:
+                row_key = str(data['key'])
+            elif 'id' in data:
+                row_key = str(data['id'])
+            else:
+                import uuid
+                row_key = str(uuid.uuid4())
             
-        # Ensure safe names for CDF Raw (alphanumeric, underscore, dash)
-        # CDF Raw constraints: 
-        # db/table: ^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,254}$
-        # key: up to 1024 chars
-        
-        # Simple sanitization for db/table if needed, but assuming topic is relatively safe
-        # or user configured valid topics. 
-        
-        if ensure_db_table(client, db_name, table_name):
+        if ensure_db_table(client, safe_db_name, safe_table_name):
             try:
-                # Insert row
-                # client.raw.rows.insert expects a list of rows (Row object or dict)
-                # If dict, it should be mapped to key/columns
-                # The SDK method signature: insert(db_name, table_name, row_list)
-                # row_list can be {"key": "k", "columns": {...}} objects
-                
                 from cognite.client.data_classes import Row
                 
                 row = Row(key=row_key, columns=data)
-                client.raw.rows.insert(db_name, table_name, [row])
-                logger.debug(f"Inserted row into Raw {db_name}.{table_name} with key {row_key}")
+                client.raw.rows.insert(safe_db_name, safe_table_name, [row])
+                logger.debug(f"Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
                 
             except Exception as e:
-                logger.error(f"Failed to insert row into {db_name}.{table_name}: {e}")
+                logger.error(f"Failed to insert row into {safe_db_name}.{safe_table_name}: {e}")
                 
     except Exception as e:
         logger.exception("Unexpected error in raw handler for topic %s", topic)

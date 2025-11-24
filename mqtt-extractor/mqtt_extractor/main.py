@@ -559,22 +559,24 @@ def main():
                     len(message.payload),
                 )
 
+                # Only track statistics for topics that match subscription filters
+                stats["messages_received"] += 1
+                stats["period_messages"] += 1
+
                 handle = _handlers.get(message.topic)
+                matched_pattern = message.topic
                 if not handle:
                     # For wildcard subscriptions, try to find a matching handler
                     for pattern, handler in _handlers.items():
                         if mqtt_topic_matches(message.topic, pattern):
                             handle = handler
+                            matched_pattern = pattern
                             logger.debug("Matched topic %s to pattern %s", message.topic, pattern)
                             break
                     
                     if not handle:
                         logger.debug("No handler for topic: %s", message.topic)
                         return
-                
-                # Only track statistics for topics that match subscription filters
-                stats["messages_received"] += 1
-                stats["period_messages"] += 1
                 
                 # Track per-topic statistics
                 if topic not in stats["by_topic"]:
@@ -592,6 +594,10 @@ def main():
                 sig = inspect.signature(handle)
                 if 'client' in sig.parameters:
                     handler_kwargs['client'] = cdf_client
+                
+                # Check if handler accepts subscription_topic argument
+                if 'subscription_topic' in sig.parameters:
+                    handler_kwargs['subscription_topic'] = matched_pattern
                 
                 for ts_id, time_stamp, value in handle(*handler_args, **handler_kwargs):
                     datapoints_from_message += 1

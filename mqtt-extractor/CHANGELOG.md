@@ -1,5 +1,12 @@
 ### Changelog
 
+**0.4.5** - 2025-11-24
+- Enhanced raw handler to parse DB and table names relative to subscription topic filter
+- Database name is derived from the last segment of the subscription base path
+- Table name is derived from the first segment after the base path
+- Added debug logging to trace topic parsing in raw handler
+- Example: filter `eastham/75_nsunkenmeadow/registry/#` with topic `eastham/75_nsunkenmeadow/registry/sites/site1` creates DB `registry` and table `sites`
+
 **0.4.4** - 2025-11-24
 - Added `raw` handler support for writing MQTT messages directly to CDF Raw service
 - Added `mqtt_raw_topics` configuration option to specify topics for raw handling
