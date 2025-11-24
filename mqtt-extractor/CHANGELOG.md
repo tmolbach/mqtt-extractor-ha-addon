@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.4.6** - 2025-11-24
+- Improved logging levels across the codebase for better production use
+- Changed skipped message logging in simple handler from INFO to DEBUG
+- Reduced startup noise by removing redundant DEBUG echo statements in run.sh
+- Changed "Topic discovered" and "Uploaded data points" messages from INFO to DEBUG
+- Only log INFO when time series are created or during periodic status updates
+- Consolidated startup progress messages for cleaner output
+
 **0.4.5** - 2025-11-24
 - Enhanced raw handler to parse DB and table names relative to subscription topic filter
 - Database name is derived from the last segment of the subscription base path

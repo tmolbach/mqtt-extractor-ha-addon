@@ -62,15 +62,15 @@ def parse(payload: bytes, topic: str):
                         return
                     elif len(numeric_values) > 1:
                         # Multiple numeric values - skip for now
-                        logger.info("Skipped (multi-value JSON): %s = %s", topic, payload_str[:80])
+                        logger.debug("Skipped (multi-value JSON): %s = %s", topic, payload_str[:80])
                         return
                     else:
                         # No numeric values in JSON
-                        logger.info("Skipped (non-numeric JSON): %s = %s", topic, payload_str[:80])
+                        logger.debug("Skipped (non-numeric JSON): %s = %s", topic, payload_str[:80])
                         return
                 else:
                     # JSON but not a dict (e.g., array)
-                    logger.info("Skipped (JSON array): %s = %s", topic, payload_str[:80])
+                    logger.debug("Skipped (JSON array): %s = %s", topic, payload_str[:80])
                     return
                     
             except json.JSONDecodeError:
@@ -94,7 +94,7 @@ def parse(payload: bytes, topic: str):
             return
         
         # It's a string value we can't convert
-        logger.info("Skipped (unconvertible string): %s = '%s'", topic, payload_str[:50])
+        logger.debug("Skipped (unconvertible string): %s = '%s'", topic, payload_str[:50])
         
     except UnicodeDecodeError as e:
         logger.warning("Failed to decode payload from topic %s: %s", topic, e)

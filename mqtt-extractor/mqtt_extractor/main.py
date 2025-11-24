@@ -489,7 +489,7 @@ def main():
     def post_upload_handler(ts_dps):
         dps = sum(len(ts["datapoints"]) for ts in ts_dps)
         metrics.cdf_data_points.inc(dps)
-        logger.info("Uploaded %d data points", dps)
+        logger.debug("Uploaded %d data points", dps)
         logger.debug("Uploaded %r", ts_dps)
         if not ts_dps:
             # calls the handler with empty ts_dps when API call fails.
@@ -607,7 +607,7 @@ def main():
 
                     # Check if this is a new external ID we haven't seen yet
                     if external_id not in seen_external_ids:
-                        logger.info("Topic discovered: %s", message.topic)
+                        logger.debug("Topic discovered: %s", message.topic)
                         logger.debug("External ID: %s", external_id)
                         seen_external_ids.add(external_id)
                         stats["timeseries_discovered"] += 1
@@ -618,7 +618,7 @@ def main():
                             logger.debug("Creating time series for topic: %s", message.topic)
                             data_type = detect_data_type(value)
                             if create_timeseries_in_data_model(cdf_client, config, external_id, message.topic, data_type):
-                                logger.info("New time series created for topic: %s (type=%s)", message.topic, data_type)
+                                logger.info("Created time series: %s (type=%s)", message.topic, data_type)
                                 stats["timeseries_created"] += 1
 
                     # Add to TS upload queue

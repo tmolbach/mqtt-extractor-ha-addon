@@ -57,9 +57,6 @@ else
 fi
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
-# Debug: Print raw topics value
-echo "[DEBUG] Raw MQTT_TOPICS value: ${MQTT_TOPICS}"
-
 # Progress indicator: Reading CDF configuration
 echo "[Startup 40%] Reading CDF configuration..."
 
@@ -124,11 +121,9 @@ if echo "${MQTT_TOPICS}" | grep -q '^\['; then
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # Trim whitespace
         if [ -n "${topic}" ]; then
             TOPIC_ARRAY+=("${topic}")
-            echo "[DEBUG] Parsed topic: '${topic}'"
         fi
     done
     # Write topics to config file
-    echo "[DEBUG] Writing ${#TOPIC_ARRAY[@]} topic(s) to config file"
     for topic in "${TOPIC_ARRAY[@]}"; do
         # Use single quotes for wildcard characters to avoid YAML parsing issues
         if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
@@ -192,11 +187,9 @@ if echo "${MQTT_RAW_TOPICS}" | grep -q '^\['; then
         topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [ -n "${topic}" ]; then
             TOPIC_ARRAY+=("${topic}")
-            echo "[DEBUG] Parsed raw topic: '${topic}'"
         fi
     done
     # Write raw topics to config file
-    echo "[DEBUG] Writing ${#TOPIC_ARRAY[@]} raw topic(s) to config file"
     for topic in "${TOPIC_ARRAY[@]}"; do
         # Use single quotes for wildcard characters
         if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
@@ -320,7 +313,6 @@ fi
 
 # Progress indicator: Starting extractor
 echo "[Startup 90%] Starting MQTT Extractor..."
-echo "[Startup 95%] Loading Python environment and dependencies..."
 
 # Print version for verification
 # Try environment variable first (set from BUILD_VERSION), then config.json, then unknown
@@ -331,24 +323,10 @@ elif [ -f "/app/config.json" ]; then
 else
     VERSION="unknown"
 fi
-echo "[Startup 97%] MQTT Extractor add-on version: ${VERSION}"
+echo "[Startup 100%] MQTT Extractor add-on version: ${VERSION}"
 if command -v bashio::log.info >/dev/null 2>&1; then
-    bashio::log.info "MQTT Extractor add-on version: ${VERSION}"
+    bashio::log.debug "MQTT Extractor add-on version: ${VERSION}"
 fi
-
-# Debug: Print full config file for troubleshooting (with sensitive data redacted)
-echo "[DEBUG] Full generated config file:"
-cat "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | sed 's/secret:.*/secret: [REDACTED]/' | sed 's/client-secret:.*/client-secret: [REDACTED]/' | while read line; do
-    echo "[DEBUG] $line"
-done
-if command -v bashio::log.debug >/dev/null 2>&1; then
-    bashio::log.debug "Full generated config file:"
-    cat "$CONFIG_FILE" 2>/dev/null | sed 's/password:.*/password: [REDACTED]/' | sed 's/secret:.*/secret: [REDACTED]/' | sed 's/client-secret:.*/client-secret: [REDACTED]/' | while read line; do
-        bashio::log.debug "$line"
-    done
-fi
-
-echo "[Startup 100%] MQTT Extractor add-on started successfully!"
 
 # Run the extractor (use python3 from venv which is in PATH)
 exec python3 /app/extractor.py "$CONFIG_FILE"
