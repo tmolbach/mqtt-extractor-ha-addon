@@ -1,5 +1,10 @@
 ### Changelog
 
+**0.5.1** - 2025-11-24
+- Added locked/unlocked to boolean conversion mappings
+  - "locked" → 1 (true)
+  - "unlocked" → 0 (false)
+
 **0.5.0** - 2025-11-24
 - Added support for structured JSON datapoint format in simple handler
 - Can now parse messages with `value`, `timestamp`, and `external_id` fields
