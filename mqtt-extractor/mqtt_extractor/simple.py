@@ -65,8 +65,8 @@ def parse(payload: bytes, topic: str):
                             except ValueError:
                                 # Try boolean conversion
                                 value_lower = raw_value.lower()
-                                true_values = {'on', 'yes', 'true', '1', 'active', 'enabled', 'open', 'high', 'online', 'arm', 'armed', 'locked'}
-                                false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed', 'unlocked'}
+                                true_values = {'on', 'yes', 'true', '1', 'active', 'enabled', 'open', 'high', 'online', 'arm', 'armed', 'locked', 'cleaning', 'returning'}
+                                false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed', 'unlocked', 'docked'}
                                 
                                 if value_lower in true_values:
                                     converted_value = 1
@@ -128,8 +128,8 @@ def parse(payload: bytes, topic: str):
         payload_lower = payload_str.lower()
         
         # Define boolean mappings (case-insensitive)
-        true_values = {'on', 'yes', 'true', '1', 'active', 'enabled', 'open', 'high', 'online', 'arm', 'armed', 'locked'}
-        false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed', 'unlocked'}
+        true_values = {'on', 'yes', 'true', '1', 'active', 'enabled', 'open', 'high', 'online', 'arm', 'armed', 'locked', 'cleaning', 'returning'}
+        false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed', 'unlocked', 'docked'}
         
         if payload_lower in true_values:
             logger.debug("Parsed as boolean: topic=%s, raw_payload='%s', parsed_value=1 (true)", topic, payload_str)

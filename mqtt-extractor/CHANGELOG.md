@@ -1,5 +1,11 @@
 ### Changelog
 
+**0.5.2** - 2025-11-24
+- Added Roomba/vacuum status conversions
+  - "cleaning" → 1 (active)
+  - "returning" → 1 (active)
+  - "docked" → 0 (inactive)
+
 **0.5.1** - 2025-11-24
 - Added locked/unlocked to boolean conversion mappings
   - "locked" → 1 (true)
