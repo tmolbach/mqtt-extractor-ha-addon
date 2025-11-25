@@ -569,9 +569,11 @@ def main():
                     return
                 
                 topic = message.topic
+                payload_preview = message.payload[:200] if len(message.payload) <= 200 else message.payload[:200] + b"..."
                 logger.debug(
-                    "MQTT message from %s (%d bytes)",
+                    "MQTT RX: topic=%s, payload=%s (%d bytes)",
                     topic,
+                    payload_preview,
                     len(message.payload),
                 )
 
@@ -618,8 +620,10 @@ def main():
                 for ts_id, time_stamp, value in handle(*handler_args, **handler_kwargs):
                     datapoints_from_message += 1
 
-                    logger.debug("Datapoint: %s = %r @ %d", ts_id, value, time_stamp)
+                    logger.debug("Handler output: ts_id=%s, value=%r (type=%s), timestamp=%d", 
+                                ts_id, value, type(value).__name__, time_stamp)
                     external_id = config.external_id_prefix + ts_id
+                    logger.debug("External ID after prefix: %s", external_id)
 
                     # Check if this is a new external ID we haven't seen yet
                     if external_id not in seen_external_ids:
@@ -640,13 +644,13 @@ def main():
                         if config.target and config.target.instance_space:
                             # Buffer data points for data model time series
                             # We'll insert them using the SDK directly
-                            logger.debug("Buffering datapoint for %s", external_id)
+                            logger.debug("Buffering for data model: %s = %r @ %d", external_id, value, time_stamp)
                             if external_id not in data_model_buffer:
                                 data_model_buffer[external_id] = []
                             data_model_buffer[external_id].append((time_stamp, value))
                         else:
                             # Use external_id for classic time series via upload queue
-                            logger.debug("Queueing datapoint for %s", external_id)
+                            logger.debug("Queueing for classic TS: %s = %r @ %d", external_id, value, time_stamp)
                             upload_queue.add_to_upload_queue(
                                 external_id=external_id, datapoints=[(time_stamp, value)]
                             )
@@ -681,14 +685,19 @@ def main():
                                 "instance_id": instance_id,
                                 "datapoints": datapoints
                             })
+                            logger.debug("Prepared for CDF upload: %s (%d datapoints)", ext_id, len(datapoints))
+                            for ts, val in datapoints:
+                                logger.debug("  -> ts=%d, value=%r (type=%s)", ts, val, type(val).__name__)
                         
                         if to_insert:
+                            logger.debug("Uploading %d time series to CDF data model", len(to_insert))
                             cdf_client.time_series.data.insert_multiple(to_insert)
                             total_dps = sum(len(item["datapoints"]) for item in to_insert)
-                            logger.debug("Inserted %d datapoints to data model", total_dps)
+                            logger.debug("CDF upload complete: %d datapoints across %d time series", total_dps, len(to_insert))
                             data_model_buffer.clear()
                     except Exception as e:
-                        logger.debug("Failed to upload datapoints to data model: %s", e)
+                        logger.error("Failed to upload datapoints to data model: %s", e)
+                        logger.debug("Full traceback:", exc_info=True)
                         data_model_buffer.clear()
 
                 # Periodic status logging with adaptive intervals

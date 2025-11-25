@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.4.9** - 2025-11-24
+- Enhanced DEBUG logging for troubleshooting data issues
+- Log every MQTT message received with topic and payload preview
+- Log parsed values with their types (int, float, bool) before sending to CDF
+- Log every datapoint queued/buffered with value and type information
+- Log detailed CDF upload operations with datapoint counts
+- Show full error tracebacks for upload failures
+
 **0.4.8** - 2025-11-24
 - Remove 'states/' prefix from topics when creating external IDs, names, and descriptions
 - Shorten INFO log messages for better readability

@@ -32,7 +32,8 @@ def parse(payload: bytes, topic: str):
         # Try to parse as numeric first
         try:
             value = float(payload_str)
-            logger.debug("Parsed numeric value - Topic: %s, Value: %s, Timestamp: %d", topic, value, timestamp)
+            logger.debug("Parsed as numeric: topic=%s, raw_payload='%s', parsed_value=%s (type=%s)", 
+                        topic, payload_str, value, type(value).__name__)
             yield external_id, timestamp, value
             return
         except ValueError:
@@ -58,8 +59,8 @@ def parse(payload: bytes, topic: str):
                     # If there's exactly one numeric value, use it
                     if len(numeric_values) == 1:
                         key, value = next(iter(numeric_values.items()))
-                        logger.debug("Extracted single value from JSON - Topic: %s, Key: %s, Value: %s", 
-                                   topic, key, value)
+                        logger.debug("Parsed from JSON: topic=%s, raw_payload='%s', json_key='%s', parsed_value=%s (type=%s)", 
+                                   topic, payload_str[:80], key, value, type(value).__name__)
                         yield external_id, timestamp, value
                         return
                     elif len(numeric_values) > 1:
@@ -87,11 +88,11 @@ def parse(payload: bytes, topic: str):
         false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed'}
         
         if payload_lower in true_values:
-            logger.debug("Boolean string '%s' -> 1 (topic: %s)", payload_str, topic)
+            logger.debug("Parsed as boolean: topic=%s, raw_payload='%s', parsed_value=1 (true)", topic, payload_str)
             yield external_id, timestamp, 1
             return
         elif payload_lower in false_values:
-            logger.debug("Boolean string '%s' -> 0 (topic: %s)", payload_str, topic)
+            logger.debug("Parsed as boolean: topic=%s, raw_payload='%s', parsed_value=0 (false)", topic, payload_str)
             yield external_id, timestamp, 0
             return
         
