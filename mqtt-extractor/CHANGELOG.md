@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.5.0** - 2025-11-24
+- Added support for structured JSON datapoint format in simple handler
+- Can now parse messages with `value`, `timestamp`, and `external_id` fields
+- Value conversion logic (on/off, boolean strings) still applied to structured format
+- Uses provided timestamp and external_id from payload when available
+- Example: `{"value": "on", "timestamp": 1764084466789, "external_id": "path/to/sensor"}`
+- Backward compatible with existing simple payload formats
+
 **0.4.9** - 2025-11-24
 - Enhanced DEBUG logging for troubleshooting data issues
 - Log every MQTT message received with topic and payload preview

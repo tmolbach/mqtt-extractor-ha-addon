@@ -47,7 +47,51 @@ def parse(payload: bytes, topic: str):
                 data = json.loads(payload_str)
                 
                 if isinstance(data, dict):
-                    # Extract numeric values from the JSON object
+                    # Check if this is a structured CDF datapoint with value, timestamp, external_id
+                    if 'value' in data and 'timestamp' in data:
+                        # Structured datapoint format
+                        raw_value = data['value']
+                        
+                        # Convert value using existing logic
+                        converted_value = None
+                        if isinstance(raw_value, (int, float)):
+                            converted_value = raw_value
+                        elif isinstance(raw_value, bool):
+                            converted_value = 1 if raw_value else 0
+                        elif isinstance(raw_value, str):
+                            # Try numeric conversion
+                            try:
+                                converted_value = float(raw_value)
+                            except ValueError:
+                                # Try boolean conversion
+                                value_lower = raw_value.lower()
+                                true_values = {'on', 'yes', 'true', '1', 'active', 'enabled', 'open', 'high', 'online', 'arm', 'armed'}
+                                false_values = {'off', 'no', 'false', '0', 'inactive', 'disabled', 'closed', 'low', 'offline', 'disarm', 'disarmed'}
+                                
+                                if value_lower in true_values:
+                                    converted_value = 1
+                                elif value_lower in false_values:
+                                    converted_value = 0
+                        
+                        if converted_value is not None:
+                            # Use provided timestamp (convert to int milliseconds if needed)
+                            ts = int(data['timestamp']) if isinstance(data['timestamp'], float) else data['timestamp']
+                            
+                            # Use provided external_id if available, otherwise derive from topic
+                            if 'external_id' in data:
+                                ext_id = main.clean_topic_for_external_id(data['external_id'])
+                            else:
+                                ext_id = external_id
+                            
+                            logger.debug("Parsed structured JSON: topic=%s, external_id=%s, value=%s->%s (type=%s), timestamp=%d", 
+                                       topic, ext_id, raw_value, converted_value, type(converted_value).__name__, ts)
+                            yield ext_id, ts, converted_value
+                            return
+                        else:
+                            logger.debug("Skipped (structured JSON with unconvertible value): %s = %s", topic, payload_str[:80])
+                            return
+                    
+                    # Not structured format, try extracting numeric values from the JSON object
                     numeric_values = {}
                     for key, val in data.items():
                         if isinstance(val, (int, float)):
