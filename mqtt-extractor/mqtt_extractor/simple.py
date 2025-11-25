@@ -21,8 +21,10 @@ def parse(payload: bytes, topic: str):
             logger.debug("Skipping empty payload from topic %s", topic)
             return
         
-        # Use the topic as the external ID (replace / with _)
-        external_id = topic.replace('/', '_')
+        # Clean the topic for use as external ID (remove 'states/' prefix, etc.)
+        # Note: We return the cleaned ID, and main.py will add the prefix
+        from . import main
+        external_id = main.clean_topic_for_external_id(topic)
         
         # Use current timestamp in milliseconds
         timestamp = int(time.time() * 1000)

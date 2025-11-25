@@ -180,6 +180,19 @@ def now() -> int:
     return int(1000 * time.time())
 
 
+def clean_topic_for_external_id(topic: str) -> str:
+    """
+    Clean up topic for use in external ID.
+    Removes 'states/' prefix if present and replaces / with _
+    """
+    # Remove 'states/' prefix if present
+    if topic.startswith('states/'):
+        topic = topic[7:]  # len('states/') = 7
+    
+    # Replace / with _ for external ID
+    return topic.replace('/', '_')
+
+
 def check_timeseries_in_data_model(cdf_client: CogniteClient, config: Config, external_id: str) -> bool:
     """Check if a CogniteTimeSeries instance exists in the data model."""
     if not config.target or not config.target.instance_space:
@@ -296,8 +309,10 @@ def create_timeseries_in_data_model(cdf_client: CogniteClient, config: Config, e
             ts = cdf_client.time_series.retrieve(external_id=external_id)
             if not ts:
                 # Create the underlying time series
-                name = topic  # Use topic as name (with slashes)
-                description = f"Time series from MQTT topic: {topic}"
+                # Remove 'states/' prefix from topic for cleaner names
+                clean_topic = topic[7:] if topic.startswith('states/') else topic
+                name = clean_topic  # Use cleaned topic as name (with slashes)
+                description = f"Time series from MQTT topic: {clean_topic}"
                 ts = TimeSeries(
                     external_id=external_id,
                     name=name,
@@ -317,9 +332,10 @@ def create_timeseries_in_data_model(cdf_client: CogniteClient, config: Config, e
             version=config.target.data_model_version
         )
         
-        # Extract name from topic (keep original format with slashes)
-        name = topic
-        description = f"Time series from MQTT topic: {topic}"
+        # Remove 'states/' prefix from topic for cleaner names
+        clean_topic = topic[7:] if topic.startswith('states/') else topic
+        name = clean_topic
+        description = f"Time series from MQTT topic: {clean_topic}"
         
         # Create the node with properties
         # The CogniteTimeSeries view requires a reference to the actual time series
@@ -334,7 +350,7 @@ def create_timeseries_in_data_model(cdf_client: CogniteClient, config: Config, e
             }
         }
         
-        logger.info("Creating time series in data model: %s (topic=%s, type=%s)", external_id, topic, data_type)
+        logger.info("Creating TS: %s (type=%s)", topic, data_type)
         
         node = NodeApply(
             space=config.target.instance_space,
@@ -571,7 +587,7 @@ def main():
                         if mqtt_topic_matches(message.topic, pattern):
                             handle = handler
                             matched_pattern = pattern
-                            logger.info("Matched topic %s to pattern %s", message.topic, pattern)
+                            logger.info("Matched: %s -> %s", message.topic, pattern)
                             break
                     
                     if not handle:
@@ -607,18 +623,15 @@ def main():
 
                     # Check if this is a new external ID we haven't seen yet
                     if external_id not in seen_external_ids:
-                        logger.debug("Topic discovered: %s", message.topic)
-                        logger.debug("External ID: %s", external_id)
                         seen_external_ids.add(external_id)
                         stats["timeseries_discovered"] += 1
                         
                         # Ensure CogniteTimeSeries exists in data model
                         # Pass the value so we can detect its data type
                         if not check_timeseries_in_data_model(cdf_client, config, external_id):
-                            logger.info("Creating time series for topic: %s", message.topic)
                             data_type = detect_data_type(value)
                             if create_timeseries_in_data_model(cdf_client, config, external_id, message.topic, data_type):
-                                logger.info("Created time series: %s (type=%s)", message.topic, data_type)
+                                logger.info("New topic: %s", message.topic)
                                 stats["timeseries_created"] += 1
 
                     # Add to TS upload queue

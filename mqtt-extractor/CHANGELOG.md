@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.4.8** - 2025-11-24
+- Remove 'states/' prefix from topics when creating external IDs, names, and descriptions
+- Shorten INFO log messages for better readability
+  - "Matched: topic -> pattern" instead of verbose matching message
+  - "Creating TS: topic (type=X)" instead of verbose creation message
+  - "New topic: X" when discovering new topics
+- Keep original full topic in metadata for reference
+
 **0.4.7** - 2025-11-24
 - Promoted topic pattern matching to INFO level for better visibility
 - Promoted time series creation details to INFO level to track resource creation
