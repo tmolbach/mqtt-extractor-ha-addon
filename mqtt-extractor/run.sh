@@ -80,7 +80,8 @@ fi
 # Get other configuration
 UPLOAD_INTERVAL=$(get_config 'upload_interval' '1')
 EXTERNAL_ID_PREFIX=$(get_config 'external_id_prefix' 'mqtt:')
-CREATE_MISSING=$(get_config 'create_missing' 'true')
+CREATE_MISSING_TIMESERIES=$(get_config 'create_missing_timeseries' 'true')
+TIMESERIES_VIEW=$(get_config 'timeseries_view_external_id' 'haTimeSeries')
 LOG_LEVEL=$(get_config 'log_level' 'INFO')
 
 # Get data model configuration
@@ -88,14 +89,14 @@ ENABLE_DATA_MODEL=$(get_config 'enable_data_model' 'false')
 INSTANCE_SPACE=$(get_config 'instance_space' '')
 DATA_MODEL_SPACE=$(get_config 'data_model_space' 'sp_enterprise_schema_space')
 DATA_MODEL_VERSION=$(get_config 'data_model_version' 'v1')
-TIMESERIES_VIEW=$(get_config 'timeseries_view_external_id' 'haTimeSeries')
 SOURCE_SYSTEM_SPACE=$(get_config 'source_system_space' 'cdf_cdm')
 SOURCE_SYSTEM_VERSION=$(get_config 'source_system_version' 'v1')
 
 # Get workflow configuration
+TRIGGER_WORKFLOWS=$(get_config 'trigger_workflows_on_raw_change' 'false')
 WORKFLOW_EXTERNAL_ID=$(get_config 'workflow_external_id' '')
 WORKFLOW_VERSION=$(get_config 'workflow_version' '')
-WORKFLOW_TRIGGER_INTERVAL=$(get_config 'workflow_trigger_interval' '300')
+WORKFLOW_MIN_TRIGGER_INTERVAL=$(get_config 'workflow_min_trigger_interval' '300')
 
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
@@ -248,7 +249,7 @@ cat >> "$CONFIG_FILE" <<EOF
 
 upload-interval: ${UPLOAD_INTERVAL}
 external-id-prefix: "${EXTERNAL_ID_PREFIX}"
-create-missing: ${CREATE_MISSING}
+create-missing: ${CREATE_MISSING_TIMESERIES}
 
 logger:
   console:
@@ -285,7 +286,7 @@ else
 fi
 
 # Add workflow configuration if enabled
-if [ -n "${WORKFLOW_EXTERNAL_ID}" ]; then
+if [ "${TRIGGER_WORKFLOWS}" = "true" ] && [ -n "${WORKFLOW_EXTERNAL_ID}" ]; then
     cat >> "$CONFIG_FILE" <<EOF
 
 workflow:
@@ -297,7 +298,7 @@ EOF
 EOF
     fi
     cat >> "$CONFIG_FILE" <<EOF
-  trigger-interval: ${WORKFLOW_TRIGGER_INTERVAL}
+  trigger-interval: ${WORKFLOW_MIN_TRIGGER_INTERVAL}
 EOF
     echo "[Startup 76%] Workflow configuration added"
 fi

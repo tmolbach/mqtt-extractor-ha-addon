@@ -77,7 +77,7 @@ class Config(BaseConfig):
     mqtt: MqttConfig
     subscriptions: List[Subscription]
     upload_interval: int = 1
-    create_missing: bool = True
+    create_missing: bool = True  # create_missing_timeseries in config
     status_pipeline: str = None
     status_interval: int = 60
     target: TargetConfig = None

@@ -1,5 +1,16 @@
 ### Changelog
 
+**0.6.1** - 2025-11-24
+- Improved configuration naming and organization for clarity
+- Renamed `create_missing` to `create_missing_timeseries` (more descriptive)
+- Grouped `timeseries_view_external_id` with time series creation settings
+- Added `trigger_workflows_on_raw_change` switch to explicitly enable workflow triggering
+- Grouped workflow settings under the trigger switch:
+  - `workflow_external_id`
+  - `workflow_version`
+  - `workflow_min_trigger_interval` (renamed from `workflow_trigger_interval`)
+- Better logical grouping of related configuration options
+
 **0.6.0** - 2025-11-24
 - Added workflow triggering support for raw handler
 - Automatically triggers CDF workflows after writing to Raw tables
