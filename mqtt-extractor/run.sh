@@ -97,6 +97,7 @@ TRIGGER_WORKFLOWS=$(get_config 'trigger_workflows_on_raw_change' 'false')
 WORKFLOW_EXTERNAL_ID=$(get_config 'workflow_external_id' '')
 WORKFLOW_VERSION=$(get_config 'workflow_version' '')
 WORKFLOW_MIN_TRIGGER_INTERVAL=$(get_config 'workflow_min_trigger_interval' '300')
+WORKFLOW_DEBOUNCE_SECONDS=$(get_config 'workflow_debounce_seconds' '5')
 
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
@@ -299,6 +300,7 @@ EOF
     fi
     cat >> "$CONFIG_FILE" <<EOF
   trigger-interval: ${WORKFLOW_MIN_TRIGGER_INTERVAL}
+  debounce-window: ${WORKFLOW_DEBOUNCE_SECONDS}
 EOF
     echo "[Startup 76%] Workflow configuration added"
 fi

@@ -1,6 +1,6 @@
 {
   "name": "MQTT to Cognite Data Fusion Extractor",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "slug": "mqtt-extractor",
   "description": "Extracts MQTT messages and pushes them to Cognite Data Fusion (CDF)",
   "arch": ["amd64", "aarch64", "armv7"],
@@ -37,6 +37,7 @@
     "workflow_external_id": "",
     "workflow_version": "",
     "workflow_min_trigger_interval": 300,
+    "workflow_debounce_seconds": 5,
     "log_level": "INFO"
   },
   "schema": {
@@ -69,6 +70,7 @@
     "workflow_external_id": "str?",
     "workflow_version": "str?",
     "workflow_min_trigger_interval": "int(1,)?",
+    "workflow_debounce_seconds": "int(1,)?",
     "log_level": "match(^(DEBUG|INFO|WARNING|ERROR)$)?"
   },
   "ports": {},

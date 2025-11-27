@@ -1,5 +1,14 @@
 ### Changelog
 
+**0.6.2** - 2025-11-26
+- Implemented debounce/burst detection for workflow triggering
+- Workflows now wait for message bursts to complete before triggering
+- New configuration: `workflow_debounce_seconds` (default: 5 seconds)
+- Each new message to the same database resets the debounce timer
+- Workflow triggers only after no messages received for the debounce window
+- Prevents multiple workflow executions during rapid message bursts
+- Example: 10 messages in 3 seconds → single workflow trigger after 5 second quiet period
+
 **0.6.1** - 2025-11-24
 - Improved configuration naming and organization for clarity
 - Renamed `create_missing` to `create_missing_timeseries` (more descriptive)

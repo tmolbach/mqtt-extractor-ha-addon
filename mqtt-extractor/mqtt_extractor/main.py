@@ -70,7 +70,8 @@ class TargetConfig:
 class WorkflowConfig:
     external_id: str = None
     version: str = None
-    trigger_interval: int = 300  # Default 5 minutes
+    trigger_interval: int = 300  # Minimum time between triggers (default 5 minutes)
+    debounce_window: int = 5  # Wait N seconds after last message before triggering (default 5 seconds)
 
 @dataclass
 class Config(BaseConfig):
@@ -460,9 +461,11 @@ def main():
         raw.workflow_config['external_id'] = config.workflow.external_id
         raw.workflow_config['version'] = config.workflow.version
         raw.workflow_config['trigger_interval'] = config.workflow.trigger_interval
-        logger.info("Workflow triggering enabled: %s (version=%s, interval=%ds)", 
+        raw.workflow_config['debounce_window'] = config.workflow.debounce_window
+        raw.workflow_config['client'] = cdf_client
+        logger.info("Workflow triggering enabled: %s (version=%s, interval=%ds, debounce=%ds)", 
                    config.workflow.external_id, config.workflow.version or "latest", 
-                   config.workflow.trigger_interval)
+                   config.workflow.trigger_interval, config.workflow.debounce_window)
     
     # Ensure CogniteSourceSystem 'MQTT' exists in the instance space
     if config.target and config.target.instance_space:
