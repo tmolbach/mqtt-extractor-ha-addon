@@ -92,6 +92,11 @@ TIMESERIES_VIEW=$(get_config 'timeseries_view_external_id' 'haTimeSeries')
 SOURCE_SYSTEM_SPACE=$(get_config 'source_system_space' 'cdf_cdm')
 SOURCE_SYSTEM_VERSION=$(get_config 'source_system_version' 'v1')
 
+# Get workflow configuration
+WORKFLOW_EXTERNAL_ID=$(get_config 'workflow_external_id' '')
+WORKFLOW_VERSION=$(get_config 'workflow_version' '')
+WORKFLOW_TRIGGER_INTERVAL=$(get_config 'workflow_trigger_interval' '300')
+
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
 version: 1
@@ -277,6 +282,24 @@ EOF
     echo "[Startup 75%] Data model configuration added"
 else
     echo "[Startup 75%] Data model disabled, skipping configuration"
+fi
+
+# Add workflow configuration if enabled
+if [ -n "${WORKFLOW_EXTERNAL_ID}" ]; then
+    cat >> "$CONFIG_FILE" <<EOF
+
+workflow:
+  external-id: "${WORKFLOW_EXTERNAL_ID}"
+EOF
+    if [ -n "${WORKFLOW_VERSION}" ]; then
+        cat >> "$CONFIG_FILE" <<EOF
+  version: "${WORKFLOW_VERSION}"
+EOF
+    fi
+    cat >> "$CONFIG_FILE" <<EOF
+  trigger-interval: ${WORKFLOW_TRIGGER_INTERVAL}
+EOF
+    echo "[Startup 76%] Workflow configuration added"
 fi
 
 # Progress indicator: Finalizing configuration

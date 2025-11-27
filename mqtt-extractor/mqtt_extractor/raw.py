@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import Generator, Tuple, Union, Any
 
 logger = logging.getLogger(__name__)
@@ -7,6 +8,18 @@ logger = logging.getLogger(__name__)
 # Cache for existing databases and tables to avoid repeated API calls
 # Structure: {db_name: {table_name: True}}
 _existing_resources = {}
+
+# Track databases that have been updated for workflow triggering
+# Structure: {db_name: last_trigger_timestamp}
+_workflow_trigger_times = {}
+
+# Workflow configuration - will be set by main.py
+workflow_config = {
+    'enabled': False,
+    'external_id': None,
+    'version': None,
+    'trigger_interval': 300,  # Default 5 minutes in seconds
+}
 
 def ensure_db_table(client, db_name: str, table_name: str) -> bool:
     """
@@ -50,6 +63,62 @@ def ensure_db_table(client, db_name: str, table_name: str) -> bool:
     except Exception as e:
         logger.error(f"Error ensuring Raw resources {db_name}.{table_name}: {e}")
         return False
+
+
+def trigger_workflow_if_needed(client, db_name: str):
+    """
+    Trigger a CDF workflow if configured and enough time has elapsed since last trigger.
+    Throttles workflow triggers per database to avoid excessive executions.
+    """
+    if not workflow_config.get('enabled'):
+        return
+    
+    if not workflow_config.get('external_id'):
+        return
+    
+    current_time = time.time()
+    last_trigger = _workflow_trigger_times.get(db_name, 0)
+    trigger_interval = workflow_config.get('trigger_interval', 300)
+    
+    # Check if enough time has elapsed since last trigger for this database
+    if current_time - last_trigger < trigger_interval:
+        logger.debug(f"Skipping workflow trigger for {db_name} (triggered {current_time - last_trigger:.1f}s ago, interval={trigger_interval}s)")
+        return
+    
+    try:
+        # Trigger the workflow
+        external_id = workflow_config['external_id']
+        version = workflow_config.get('version')
+        
+        # Prepare input data for the workflow
+        input_data = {
+            'database': db_name,
+            'triggered_by': 'mqtt-extractor-raw',
+            'timestamp': int(current_time * 1000)
+        }
+        
+        logger.info(f"Triggering workflow: {external_id} (version={version}) for database: {db_name}")
+        
+        if version:
+            execution = client.workflows.executions.run(
+                workflow_external_id=external_id,
+                version=version,
+                input=input_data
+            )
+        else:
+            execution = client.workflows.executions.run(
+                workflow_external_id=external_id,
+                input=input_data
+            )
+        
+        logger.info(f"Workflow triggered successfully: execution_id={execution.id}")
+        
+        # Update last trigger time
+        _workflow_trigger_times[db_name] = current_time
+        
+    except Exception as e:
+        logger.error(f"Failed to trigger workflow for database {db_name}: {e}")
+        logger.debug("Full traceback:", exc_info=True)
 
 def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: str = None) -> Generator[Tuple[str, int, Union[int, float, str]], None, None]:
     """
@@ -178,6 +247,9 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 row = Row(key=row_key, columns=data)
                 client.raw.rows.insert(safe_db_name, safe_table_name, [row])
                 logger.debug(f"Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
+                
+                # Trigger workflow if configured (throttled per database)
+                trigger_workflow_if_needed(client, safe_db_name)
                 
             except Exception as e:
                 logger.error(f"Failed to insert row into {safe_db_name}.{safe_table_name}: {e}")

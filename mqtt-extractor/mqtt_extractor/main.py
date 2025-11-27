@@ -67,6 +67,12 @@ class TargetConfig:
     source_system_version: str = "v1"
 
 @dataclass
+class WorkflowConfig:
+    external_id: str = None
+    version: str = None
+    trigger_interval: int = 300  # Default 5 minutes
+
+@dataclass
 class Config(BaseConfig):
     mqtt: MqttConfig
     subscriptions: List[Subscription]
@@ -75,6 +81,7 @@ class Config(BaseConfig):
     status_pipeline: str = None
     status_interval: int = 60
     target: TargetConfig = None
+    workflow: WorkflowConfig = None
     max_datapoints: int = None  # Stop after this many datapoints (for testing)
     external_id_prefix: str = "mqtt:"  # Prefix on external ID used when creating CDF resources
 
@@ -445,6 +452,17 @@ def main():
 
     # Create Cognite client using config (which may have environment variables substituted)
     cdf_client = config.cognite.get_cognite_client("mqtt-extractor")
+    
+    # Configure workflow triggering for raw handler if enabled
+    if config.workflow and config.workflow.external_id:
+        from . import raw
+        raw.workflow_config['enabled'] = True
+        raw.workflow_config['external_id'] = config.workflow.external_id
+        raw.workflow_config['version'] = config.workflow.version
+        raw.workflow_config['trigger_interval'] = config.workflow.trigger_interval
+        logger.info("Workflow triggering enabled: %s (version=%s, interval=%ds)", 
+                   config.workflow.external_id, config.workflow.version or "latest", 
+                   config.workflow.trigger_interval)
     
     # Ensure CogniteSourceSystem 'MQTT' exists in the instance space
     if config.target and config.target.instance_space:

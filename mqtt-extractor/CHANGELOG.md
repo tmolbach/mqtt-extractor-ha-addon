@@ -1,5 +1,16 @@
 ### Changelog
 
+**0.6.0** - 2025-11-24
+- Added workflow triggering support for raw handler
+- Automatically triggers CDF workflows after writing to Raw tables
+- Configurable workflow external ID and version
+- Throttling per database to avoid excessive workflow executions (default: 5 minutes)
+- New configuration options:
+  - `workflow_external_id`: External ID of workflow to trigger
+  - `workflow_version`: Specific version of workflow (optional, uses latest if not specified)
+  - `workflow_trigger_interval`: Minimum seconds between triggers per database (default: 300)
+- Workflow receives input data with database name, trigger source, and timestamp
+
 **0.5.2** - 2025-11-24
 - Added Roomba/vacuum status conversions
   - "cleaning" → 1 (active)
