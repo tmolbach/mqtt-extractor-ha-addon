@@ -90,21 +90,26 @@ def trigger_workflow_if_needed(client, db_name: str):
                 'last_update': 0,
                 'last_trigger': 0,
                 'timer': None,
-                'pending': False
+                'pending': False,
+                'is_delayed': False  # Track if this is a delayed trigger
             }
         
         pending_info = _workflow_pending[db_name]
         
-        # Cancel any existing timer
+        # Cancel any existing timer (whether debounce or delayed trigger)
         if pending_info.get('timer'):
             pending_info['timer'].cancel()
-            logger.debug(f"Workflow trigger for {db_name} rescheduled (burst continuing)")
+            if pending_info.get('is_delayed'):
+                logger.debug(f"Workflow delayed trigger for {db_name} cancelled (new burst started)")
+            else:
+                logger.debug(f"Workflow trigger for {db_name} rescheduled (burst continuing)")
         else:
-            logger.debug(f"Workflow trigger for {db_name} scheduled (burst started, last_trigger={pending_info.get('last_trigger', 0):.0f}s ago)")
+            logger.debug(f"Workflow trigger for {db_name} scheduled (burst started, last_trigger={current_time - pending_info.get('last_trigger', 0):.0f}s ago)")
         
         # Update state
         pending_info['last_update'] = current_time
         pending_info['pending'] = True
+        pending_info['is_delayed'] = False  # This is a fresh burst, not a delayed trigger
         
         # Schedule a new timer for the debounce window
         debounce_window = workflow_config.get('debounce_window', 5)
@@ -137,8 +142,17 @@ def _execute_workflow_trigger(client, db_name: str):
         
         # Check if enough time has elapsed since last actual trigger
         if time_since_last < trigger_interval:
-            logger.info(f"Skipping workflow trigger for {db_name} (last triggered {time_since_last:.1f}s ago, min_interval={trigger_interval}s, retry in {trigger_interval - time_since_last:.1f}s)")
-            pending_info['pending'] = False
+            time_until_ready = trigger_interval - time_since_last
+            logger.info(f"Skipping immediate workflow trigger for {db_name} (last triggered {time_since_last:.1f}s ago, min_interval={trigger_interval}s)")
+            logger.info(f"Scheduling delayed workflow trigger for {db_name} in {time_until_ready:.1f}s to process these changes")
+            
+            # Schedule a delayed trigger for when the interval will have elapsed
+            delayed_timer = threading.Timer(time_until_ready, _execute_workflow_trigger, args=(client, db_name))
+            delayed_timer.daemon = True
+            pending_info['timer'] = delayed_timer
+            pending_info['pending'] = True  # Keep pending for the delayed trigger
+            pending_info['is_delayed'] = True  # Mark as delayed trigger
+            delayed_timer.start()
             return
         
         # Mark as no longer pending and update last trigger time

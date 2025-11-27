@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.6.4** - 2025-11-26
+- Added delayed workflow triggering to ensure changes are never missed
+- When a burst occurs too soon after the last trigger, automatically schedules a delayed trigger
+- Delayed trigger executes exactly when the minimum interval has elapsed
+- New bursts during a delayed trigger period will cancel the delay and start fresh debounce
+- Ensures rare changes (daily or less frequent) always trigger workflows
+- Example: Burst at T+0min triggers immediately, burst at T+1min schedules delayed trigger at T+5min
+
 **0.6.3** - 2025-11-26
 - Fixed workflow trigger state management to properly handle multiple bursts
 - Improved workflow trigger logging to show time since last trigger and retry timing
