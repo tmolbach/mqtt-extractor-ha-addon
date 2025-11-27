@@ -84,33 +84,33 @@ def trigger_workflow_if_needed(client, db_name: str):
     with _workflow_lock:
         current_time = time.time()
         
-        # Check if there's already a pending trigger for this database
-        if db_name in _workflow_pending:
-            pending_info = _workflow_pending[db_name]
-            
-            # Cancel the existing timer
-            if pending_info.get('timer'):
-                pending_info['timer'].cancel()
-            
-            # Update last update time
-            pending_info['last_update'] = current_time
-            
+        # Get or create pending info for this database
+        if db_name not in _workflow_pending:
+            _workflow_pending[db_name] = {
+                'last_update': 0,
+                'last_trigger': 0,
+                'timer': None,
+                'pending': False
+            }
+        
+        pending_info = _workflow_pending[db_name]
+        
+        # Cancel any existing timer
+        if pending_info.get('timer'):
+            pending_info['timer'].cancel()
             logger.debug(f"Workflow trigger for {db_name} rescheduled (burst continuing)")
         else:
-            # First message for this database in this burst
-            _workflow_pending[db_name] = {
-                'last_update': current_time,
-                'last_trigger': _workflow_pending.get(db_name, {}).get('last_trigger', 0) if db_name in _workflow_pending else 0,
-                'timer': None,
-                'pending': True
-            }
-            logger.debug(f"Workflow trigger for {db_name} scheduled (burst started)")
+            logger.debug(f"Workflow trigger for {db_name} scheduled (burst started, last_trigger={pending_info.get('last_trigger', 0):.0f}s ago)")
+        
+        # Update state
+        pending_info['last_update'] = current_time
+        pending_info['pending'] = True
         
         # Schedule a new timer for the debounce window
         debounce_window = workflow_config.get('debounce_window', 5)
         timer = threading.Timer(debounce_window, _execute_workflow_trigger, args=(client, db_name))
         timer.daemon = True
-        _workflow_pending[db_name]['timer'] = timer
+        pending_info['timer'] = timer
         timer.start()
 
 
@@ -120,23 +120,31 @@ def _execute_workflow_trigger(client, db_name: str):
     Called by the Timer thread.
     """
     with _workflow_lock:
-        if db_name not in _workflow_pending or not _workflow_pending[db_name].get('pending'):
+        if db_name not in _workflow_pending:
+            logger.debug(f"Workflow trigger cancelled for {db_name} (no pending info)")
+            return
+            
+        pending_info = _workflow_pending[db_name]
+        
+        if not pending_info.get('pending'):
+            logger.debug(f"Workflow trigger cancelled for {db_name} (not pending)")
             return
         
-        pending_info = _workflow_pending[db_name]
         current_time = time.time()
         last_trigger = pending_info.get('last_trigger', 0)
         trigger_interval = workflow_config.get('trigger_interval', 300)
+        time_since_last = current_time - last_trigger if last_trigger > 0 else float('inf')
         
         # Check if enough time has elapsed since last actual trigger
-        if current_time - last_trigger < trigger_interval:
-            logger.info(f"Skipping workflow trigger for {db_name} (last triggered {current_time - last_trigger:.1f}s ago, interval={trigger_interval}s)")
+        if time_since_last < trigger_interval:
+            logger.info(f"Skipping workflow trigger for {db_name} (last triggered {time_since_last:.1f}s ago, min_interval={trigger_interval}s, retry in {trigger_interval - time_since_last:.1f}s)")
             pending_info['pending'] = False
             return
         
-        # Mark as no longer pending before we trigger (in case trigger takes time)
+        # Mark as no longer pending and update last trigger time
         pending_info['pending'] = False
         pending_info['last_trigger'] = current_time
+        logger.debug(f"Executing workflow trigger for {db_name} (time_since_last={time_since_last:.1f}s)")
     
     # Trigger outside the lock to avoid blocking
     try:

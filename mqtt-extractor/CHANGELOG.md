@@ -1,5 +1,12 @@
 ### Changelog
 
+**0.6.3** - 2025-11-26
+- Fixed workflow trigger state management to properly handle multiple bursts
+- Improved workflow trigger logging to show time since last trigger and retry timing
+- Fixed issue where `last_trigger` time wasn't properly preserved between bursts
+- Now correctly schedules new workflows after the minimum interval has elapsed
+- Added detailed debug logging for workflow trigger state transitions
+
 **0.6.2** - 2025-11-26
 - Implemented debounce/burst detection for workflow triggering
 - Workflows now wait for message bursts to complete before triggering
