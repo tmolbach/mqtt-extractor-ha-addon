@@ -74,6 +74,14 @@ class WorkflowConfig:
     debounce_window: int = 5  # Wait N seconds after last message before triggering (default 5 seconds)
 
 @dataclass
+class AlarmEventConfig:
+    instance_space: str = None
+    data_model_space: str = "sp_enterprise_schema_space"
+    data_model_version: str = "v1"
+    view_external_id: str = "haAlarmEvent"
+    source_system: str = "MQTT"
+
+@dataclass
 class Config(BaseConfig):
     mqtt: MqttConfig
     subscriptions: List[Subscription]
@@ -83,6 +91,7 @@ class Config(BaseConfig):
     status_interval: int = 60
     target: TargetConfig = None
     workflow: WorkflowConfig = None
+    alarm_events: AlarmEventConfig = None
     max_datapoints: int = None  # Stop after this many datapoints (for testing)
     external_id_prefix: str = "mqtt:"  # Prefix on external ID used when creating CDF resources
 
@@ -98,6 +107,16 @@ def config_logging(config_file):
 
 
 _handlers = {}
+
+# Global config for alarm event handler
+alarm_event_config = {
+    'enabled': False,
+    'instance_space': None,
+    'data_model_space': 'sp_enterprise_schema_space',
+    'data_model_version': 'v1',
+    'view_external_id': 'haAlarmEvent',
+    'source_system': 'MQTT',
+}
 
 
 def mqtt_topic_matches(topic: str, pattern: str) -> bool:
@@ -466,6 +485,19 @@ def main():
         logger.info("Workflow triggering enabled: %s (version=%s, interval=%ds, debounce=%ds)", 
                    config.workflow.external_id, config.workflow.version or "latest", 
                    config.workflow.trigger_interval, config.workflow.debounce_window)
+    
+    # Configure alarm event handler if enabled
+    if config.alarm_events and config.alarm_events.instance_space:
+        global alarm_event_config
+        alarm_event_config['enabled'] = True
+        alarm_event_config['instance_space'] = config.alarm_events.instance_space
+        alarm_event_config['data_model_space'] = config.alarm_events.data_model_space
+        alarm_event_config['data_model_version'] = config.alarm_events.data_model_version
+        alarm_event_config['view_external_id'] = config.alarm_events.view_external_id
+        alarm_event_config['source_system'] = config.alarm_events.source_system
+        logger.info("Alarm event handler enabled: view=%s/%s (space=%s)", 
+                   config.alarm_events.data_model_space, config.alarm_events.view_external_id,
+                   config.alarm_events.instance_space)
     
     # Ensure CogniteSourceSystem 'MQTT' exists in the instance space
     if config.target and config.target.instance_space:

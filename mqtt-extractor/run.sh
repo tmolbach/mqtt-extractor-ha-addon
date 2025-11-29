@@ -51,9 +51,11 @@ echo "[Startup 30%] MQTT configuration loaded: ${MQTT_HOSTNAME}:${MQTT_PORT}"
 if command -v bashio::config >/dev/null 2>&1; then
     MQTT_TOPICS=$(bashio::config 'mqtt_topics' 2>/dev/null || echo '["*"]')
     MQTT_RAW_TOPICS=$(bashio::config 'mqtt_raw_topics' 2>/dev/null || echo '[]')
+    MQTT_EVENT_TOPICS=$(bashio::config 'mqtt_event_topics' 2>/dev/null || echo '[]')
 else
     MQTT_TOPICS='["*"]'
     MQTT_RAW_TOPICS='[]'
+    MQTT_EVENT_TOPICS='[]'
 fi
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
@@ -98,6 +100,14 @@ WORKFLOW_EXTERNAL_ID=$(get_config 'workflow_external_id' '')
 WORKFLOW_VERSION=$(get_config 'workflow_version' '')
 WORKFLOW_MIN_TRIGGER_INTERVAL=$(get_config 'workflow_min_trigger_interval' '300')
 WORKFLOW_DEBOUNCE_SECONDS=$(get_config 'workflow_debounce_seconds' '5')
+
+# Get alarm event configuration
+ENABLE_ALARM_EVENTS=$(get_config 'enable_alarm_events' 'false')
+ALARM_EVENT_INSTANCE_SPACE=$(get_config 'alarm_event_instance_space' '')
+ALARM_EVENT_VIEW=$(get_config 'alarm_event_view_external_id' 'haAlarmEvent')
+ALARM_EVENT_DATA_MODEL_SPACE=$(get_config 'alarm_event_data_model_space' 'sp_enterprise_schema_space')
+ALARM_EVENT_DATA_MODEL_VERSION=$(get_config 'alarm_event_data_model_version' 'v1')
+ALARM_EVENT_SOURCE_SYSTEM=$(get_config 'alarm_event_source_system' 'MQTT')
 
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
@@ -245,6 +255,68 @@ EOF
     done
 fi
 
+# Process event topics - handle both array format and comma-separated string
+# Similar parsing logic but assigns mqtt_extractor.event handler
+if echo "${MQTT_EVENT_TOPICS}" | grep -q '^\['; then
+    # Array format: ["topic1", "topic2"]
+    TOPIC_ARRAY=()
+    PARSED_TOPICS=$(echo "${MQTT_EVENT_TOPICS}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr '\n' ',')
+    IFS=',' read -ra TEMP_ARRAY <<< "${PARSED_TOPICS}"
+    for topic in "${TEMP_ARRAY[@]}"; do
+        topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -n "${topic}" ]; then
+            TOPIC_ARRAY+=("${topic}")
+        fi
+    done
+    # Write event topics to config file
+    for topic in "${TOPIC_ARRAY[@]}"; do
+        # Use single quotes for wildcard characters
+        if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
+            printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+            cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+    handler:
+      module: mqtt_extractor.event
+WILDCARD_EOF
+        else
+            cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.event
+EOF
+        fi
+    done
+else
+    # Comma-separated or single topic
+    PARSED_TOPICS=$(echo "${MQTT_EVENT_TOPICS}" | tr '\n' ',')
+    IFS=',' read -ra TOPIC_ARRAY <<< "${PARSED_TOPICS}"
+    for topic in "${TOPIC_ARRAY[@]}"; do
+        topic=$(echo "${topic}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -n "${topic}" ]; then
+            if [ "${topic}" = "*" ] || [ "${topic}" = "+" ]; then
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+  - topic: '*'
+WILDCARD_EOF
+                printf "    qos: %s\n" "${MQTT_QOS}" >> "$CONFIG_FILE"
+                cat >> "$CONFIG_FILE" <<'WILDCARD_EOF'
+    handler:
+      module: mqtt_extractor.event
+WILDCARD_EOF
+            else
+                cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.event
+EOF
+            fi
+        fi
+    done
+fi
+
 # Add remaining configuration
 cat >> "$CONFIG_FILE" <<EOF
 
@@ -303,6 +375,20 @@ EOF
   debounce-window: ${WORKFLOW_DEBOUNCE_SECONDS}
 EOF
     echo "[Startup 76%] Workflow configuration added"
+fi
+
+# Add alarm event configuration if enabled
+if [ "${ENABLE_ALARM_EVENTS}" = "true" ] && [ -n "${ALARM_EVENT_INSTANCE_SPACE}" ]; then
+    cat >> "$CONFIG_FILE" <<EOF
+
+alarm-events:
+  instance-space: "${ALARM_EVENT_INSTANCE_SPACE}"
+  data-model-space: "${ALARM_EVENT_DATA_MODEL_SPACE}"
+  data-model-version: "${ALARM_EVENT_DATA_MODEL_VERSION}"
+  view-external-id: "${ALARM_EVENT_VIEW}"
+  source-system: "${ALARM_EVENT_SOURCE_SYSTEM}"
+EOF
+    echo "[Startup 77%] Alarm event configuration added"
 fi
 
 # Progress indicator: Finalizing configuration

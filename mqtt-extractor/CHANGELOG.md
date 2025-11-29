@@ -1,5 +1,20 @@
 ### Changelog
 
+**0.7.0** - 2025-11-26
+- Added alarm event handler for writing to CDF data model (haAlarmEvent view)
+- New `mqtt_event_topics` configuration for alarm event subscriptions
+- Supports ALARM_START and ALARM_END event types
+- Auto-creates alarm event instances with proper relationships
+- Configuration options:
+  - `enable_alarm_events`: Enable/disable alarm event handling
+  - `alarm_event_instance_space`: Instance space for alarm events
+  - `alarm_event_view_external_id`: View to write to (default: haAlarmEvent)
+  - `alarm_event_data_model_space`: Data model space (default: sp_enterprise_schema_space)
+  - `alarm_event_data_model_version`: Data model version (default: v1)
+  - `alarm_event_source_system`: Source system reference (default: MQTT)
+- Extracts trigger entity, value, metadata from MQTT payload
+- Links to alarm definitions via external ID reference
+
 **0.6.4** - 2025-11-26
 - Added delayed workflow triggering to ensure changes are never missed
 - When a burst occurs too soon after the last trigger, automatically schedules a delayed trigger
