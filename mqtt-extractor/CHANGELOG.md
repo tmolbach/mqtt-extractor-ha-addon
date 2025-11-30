@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.7.1** - 2025-11-30
+- Fixed alarm event handler to support camelCase field names from MQTT payload
+- Now handles both `externalIdPrefix` and `external_id_prefix`
+- Now handles both `startTime` and `start_time`
+- Now handles both `definition` and `alarm_definition_id`
+- Added ISO 8601 timestamp parsing for string timestamps (e.g., "2025-11-30T23:46:16.005Z")
+- Fixed issue where all alarm properties were showing as None
+
 **0.7.0** - 2025-11-26
 - Added alarm event handler for writing to CDF data model (haAlarmEvent view)
 - New `mqtt_event_topics` configuration for alarm event subscriptions

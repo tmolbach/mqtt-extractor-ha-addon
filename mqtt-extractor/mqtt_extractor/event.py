@@ -72,15 +72,34 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.error("Instance space not configured for alarm events")
             return
 
-        # Extract data from payload
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        external_id_prefix = data.get('external_id_prefix', '')
-        alarm_definition_id = data.get('alarm_definition_id')
+        # Extract data from payload (support both camelCase and snake_case)
+        start_time = data.get('startTime') or data.get('start_time')
+        end_time = data.get('endTime') or data.get('end_time')
+        external_id_prefix = data.get('externalIdPrefix') or data.get('external_id_prefix', '')
+        alarm_definition_id = data.get('definition') or data.get('alarm_definition_id')
         message = data.get('message', '')
-        value_raw = data.get('value_raw')
+        value_raw = data.get('valueRaw') or data.get('value_raw')
         metadata = data.get('metadata', {})
-        trigger_entity = metadata.get('trigger_entity', '')
+        trigger_entity = metadata.get('triggerEntity') or metadata.get('trigger_entity', '')
+        
+        # Parse ISO timestamp to milliseconds if needed
+        if isinstance(start_time, str):
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                start_time = int(dt.timestamp() * 1000)
+            except Exception as e:
+                logger.warning(f"Failed to parse start_time '{start_time}': {e}")
+                start_time = None
+        
+        if isinstance(end_time, str):
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                end_time = int(dt.timestamp() * 1000)
+            except Exception as e:
+                logger.warning(f"Failed to parse end_time '{end_time}': {e}")
+                end_time = None
 
         # Generate external ID for this occurrence
         # If it's an ALARM_START, create new occurrence with timestamp
