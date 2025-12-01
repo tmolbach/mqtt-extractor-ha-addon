@@ -45,6 +45,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Parse JSON
         try:
             data = json.loads(payload_str)
+            logger.debug(f"Parsed alarm event JSON: {json.dumps(data, indent=2)}")
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse JSON for topic %s: %s", topic, e)
             return
@@ -81,6 +82,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         value_raw = data.get('valueRaw') or data.get('value_raw')
         metadata = data.get('metadata', {})
         trigger_entity = metadata.get('triggerEntity') or metadata.get('trigger_entity', '')
+        
+        # Log the raw data for debugging
+        logger.debug(f"Raw alarm data: type={event_type}, definition={alarm_definition_id}, trigger_entity={trigger_entity}, value_raw={value_raw}")
+        logger.debug(f"Metadata: {metadata}")
         
         # Helper function to normalize timestamps to ISO 8601 string for CDF
         def normalize_timestamp(ts):
@@ -147,13 +152,19 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Prepare properties for the alarm event
         properties = {
             'name': message or f"Alarm occurrence {external_id}",
-            'description': f"Alarm event from {trigger_entity}",
+            'description': f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event",
             'sourceContext': 'MQTT',
             'sourceId': external_id,
             'startTime': start_time,
-            'valueAtTrigger': str(value_raw) if value_raw is not None else None,
-            'triggerEntity': trigger_entity,
         }
+        
+        # Add valueAtTrigger if available
+        if value_raw is not None:
+            properties['valueAtTrigger'] = str(value_raw)
+        
+        # Add triggerEntity if available
+        if trigger_entity:
+            properties['triggerEntity'] = trigger_entity
 
         # Add end time if this is an ALARM_END event
         if event_type == 'ALARM_END' and end_time:
@@ -165,6 +176,23 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 'space': instance_space,
                 'externalId': alarm_definition_id
             }
+        
+        # Add asset references if provided in payload
+        assets = data.get('assets', [])
+        if assets and isinstance(assets, list):
+            # Convert asset external IDs to NodeId references
+            asset_refs = []
+            for asset in assets:
+                if isinstance(asset, str):
+                    asset_refs.append({'space': instance_space, 'externalId': asset})
+                elif isinstance(asset, dict) and 'externalId' in asset:
+                    asset_refs.append({
+                        'space': asset.get('space', instance_space),
+                        'externalId': asset['externalId']
+                    })
+            if asset_refs:
+                properties['assets'] = asset_refs
+                logger.debug(f"Added {len(asset_refs)} asset references to alarm event")
 
         # Add source system reference if configured
         source_system = alarm_config.get('source_system', 'MQTT')
@@ -197,9 +225,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
             logger.info(f"Alarm event {event_type}: {external_id} written to CDF")
-            logger.debug(f"Properties: {properties}")
+            logger.debug(f"Alarm event properties written: {json.dumps(properties, indent=2, default=str)}")
         except Exception as e:
             logger.error(f"Failed to write alarm event to CDF: {e}")
+            logger.debug(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:

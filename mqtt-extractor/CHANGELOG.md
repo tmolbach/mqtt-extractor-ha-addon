@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.7.3** - 2025-11-30
+- Added support for asset references in alarm event payloads
+- Fixed property handling to avoid sending null/None values to CDF
+- Added comprehensive DEBUG logging for alarm event payloads and properties
+- Log full parsed JSON payload and written properties at DEBUG level
+- Only include triggerEntity and valueAtTrigger if they have actual values
+- Support for both string asset IDs and object format with space/externalId
+
 **0.7.2** - 2025-11-30
 - Fixed timestamp format for CDF data model - must be ISO 8601 string, not milliseconds
 - Convert numeric timestamps to ISO 8601 format: "2025-11-30T19:02:16.970Z"
