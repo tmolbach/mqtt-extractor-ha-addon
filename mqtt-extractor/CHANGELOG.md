@@ -1,5 +1,12 @@
 ### Changelog
 
+**0.7.2** - 2025-11-30
+- Fixed timestamp format for CDF data model - must be ISO 8601 string, not milliseconds
+- Convert numeric timestamps to ISO 8601 format: "2025-11-30T19:02:16.970Z"
+- Keep string timestamps as-is if already in ISO format
+- Use milliseconds timestamp only for external ID generation
+- Fixed 400 error: "The value of property 'startTime' must be a string in the format 'YYYY-MM-DDTHH:MM:SS[.millis]...'"
+
 **0.7.1** - 2025-11-30
 - Fixed alarm event handler to support camelCase field names from MQTT payload
 - Now handles both `externalIdPrefix` and `external_id_prefix`

@@ -73,8 +73,8 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             return
 
         # Extract data from payload (support both camelCase and snake_case)
-        start_time = data.get('startTime') or data.get('start_time')
-        end_time = data.get('endTime') or data.get('end_time')
+        start_time_raw = data.get('startTime') or data.get('start_time')
+        end_time_raw = data.get('endTime') or data.get('end_time')
         external_id_prefix = data.get('externalIdPrefix') or data.get('external_id_prefix', '')
         alarm_definition_id = data.get('definition') or data.get('alarm_definition_id')
         message = data.get('message', '')
@@ -82,33 +82,50 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         metadata = data.get('metadata', {})
         trigger_entity = metadata.get('triggerEntity') or metadata.get('trigger_entity', '')
         
-        # Parse ISO timestamp to milliseconds if needed
-        if isinstance(start_time, str):
-            try:
-                from datetime import datetime
-                dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                start_time = int(dt.timestamp() * 1000)
-            except Exception as e:
-                logger.warning(f"Failed to parse start_time '{start_time}': {e}")
-                start_time = None
+        # Helper function to normalize timestamps to ISO 8601 string for CDF
+        def normalize_timestamp(ts):
+            """Convert timestamp to ISO 8601 string format required by CDF."""
+            if ts is None:
+                return None
+            
+            from datetime import datetime, timezone
+            
+            # If it's already a string, return as-is (assuming it's already ISO format)
+            if isinstance(ts, str):
+                return ts
+            
+            # If it's a number, treat as milliseconds since epoch
+            if isinstance(ts, (int, float)):
+                dt = datetime.fromtimestamp(ts / 1000.0, tz=timezone.utc)
+                return dt.isoformat().replace('+00:00', 'Z')
+            
+            return None
         
-        if isinstance(end_time, str):
+        # Normalize timestamps for CDF (must be ISO 8601 strings)
+        start_time = normalize_timestamp(start_time_raw)
+        end_time = normalize_timestamp(end_time_raw)
+        
+        # For external ID generation, we need milliseconds
+        # Extract numeric timestamp for external ID
+        if isinstance(start_time_raw, str):
             try:
                 from datetime import datetime
-                dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-                end_time = int(dt.timestamp() * 1000)
+                dt = datetime.fromisoformat(start_time_raw.replace('Z', '+00:00'))
+                start_time_ms = int(dt.timestamp() * 1000)
             except Exception as e:
-                logger.warning(f"Failed to parse end_time '{end_time}': {e}")
-                end_time = None
+                logger.warning(f"Failed to parse start_time '{start_time_raw}': {e}")
+                start_time_ms = int(time.time() * 1000)  # Fallback to now
+        else:
+            start_time_ms = start_time_raw or int(time.time() * 1000)
 
         # Generate external ID for this occurrence
         # If it's an ALARM_START, create new occurrence with timestamp
         # If it's an ALARM_END, we need to find and update the existing occurrence
         if event_type == 'ALARM_START':
-            external_id = f"{external_id_prefix}{start_time}"
+            external_id = f"{external_id_prefix}{start_time_ms}"
         else:
             # For ALARM_END, try to find the most recent open alarm
-            external_id = f"{external_id_prefix}{start_time}"
+            external_id = f"{external_id_prefix}{start_time_ms}"
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
