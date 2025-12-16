@@ -6,6 +6,30 @@ from typing import Generator, Tuple, Union, Any
 logger = logging.getLogger(__name__)
 
 
+def sanitize_external_id(ext_id: str) -> str:
+    """
+    Ensure external ID meets CDF naming requirements.
+    Must start with a letter and contain only letters, numbers, and underscores.
+    """
+    if not ext_id:
+        return ext_id
+    
+    # If it starts with a number, prefix with "alarm_"
+    if ext_id[0].isdigit():
+        ext_id = f"alarm_{ext_id}"
+    
+    # Replace any invalid characters (like dots, hyphens, spaces) with underscores
+    # CDF allows: letters, numbers, underscores
+    sanitized = ''
+    for char in ext_id:
+        if char.isalnum() or char == '_':
+            sanitized += char
+        else:
+            sanitized += '_'
+    
+    return sanitized
+
+
 def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: str = None) -> Generator[Tuple[str, int, Union[int, float, str]], None, None]:
     """
     Parse alarm event MQTT payloads and write to CDF data model (haAlarmEvent view).
@@ -124,14 +148,24 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         else:
             start_time_ms = start_time_raw or int(time.time() * 1000)
 
-        # Generate external ID for this occurrence
-        # If it's an ALARM_START, create new occurrence with timestamp
-        # If it's an ALARM_END, we need to find and update the existing occurrence
-        if event_type == 'ALARM_START':
-            external_id = f"{external_id_prefix}{start_time_ms}"
+        # Check if payload provides a complete external_id
+        if 'external_id' in data or 'externalId' in data:
+            external_id = data.get('external_id') or data.get('externalId')
         else:
-            # For ALARM_END, try to find the most recent open alarm
-            external_id = f"{external_id_prefix}{start_time_ms}"
+            # Generate external ID from prefix and timestamp
+            # If it's an ALARM_START, create new occurrence with timestamp
+            # If it's an ALARM_END, we need to find and update the existing occurrence
+            if event_type == 'ALARM_START':
+                external_id = f"{external_id_prefix}{start_time_ms}"
+            else:
+                # For ALARM_END, try to find the most recent open alarm
+                external_id = f"{external_id_prefix}{start_time_ms}"
+        
+        # Sanitize external_id to meet CDF naming requirements
+        original_ext_id = external_id
+        external_id = sanitize_external_id(external_id)
+        if external_id != original_ext_id:
+            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
@@ -173,9 +207,12 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         # Add reference to alarm definition if provided
         if alarm_definition_id:
+            sanitized_def_id = sanitize_external_id(alarm_definition_id)
+            if sanitized_def_id != alarm_definition_id:
+                logger.debug(f"Sanitized definition ID: {alarm_definition_id} -> {sanitized_def_id}")
             properties['definition'] = {
                 'space': instance_space,
-                'externalId': alarm_definition_id
+                'externalId': sanitized_def_id
             }
         
         # Add asset references if provided in payload
@@ -185,11 +222,13 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             asset_refs = []
             for asset in assets:
                 if isinstance(asset, str):
-                    asset_refs.append({'space': instance_space, 'externalId': asset})
+                    sanitized_asset_id = sanitize_external_id(asset)
+                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset_id})
                 elif isinstance(asset, dict) and 'externalId' in asset:
+                    sanitized_asset_id = sanitize_external_id(asset['externalId'])
                     asset_refs.append({
                         'space': asset.get('space', instance_space),
-                        'externalId': asset['externalId']
+                        'externalId': sanitized_asset_id
                     })
             if asset_refs:
                 properties['assets'] = asset_refs

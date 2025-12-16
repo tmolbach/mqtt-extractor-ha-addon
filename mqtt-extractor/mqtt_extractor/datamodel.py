@@ -31,6 +31,30 @@ logger = logging.getLogger(__name__)
 data_model_writes_config: Dict[str, Dict] = {}
 
 
+def sanitize_external_id(ext_id: str) -> str:
+    """
+    Ensure external ID meets CDF naming requirements.
+    Must start with a letter and contain only letters, numbers, and underscores.
+    """
+    if not ext_id:
+        return ext_id
+    
+    # If it starts with a number, prefix with "alarm_"
+    if ext_id[0].isdigit():
+        ext_id = f"alarm_{ext_id}"
+    
+    # Replace any invalid characters (like dots, hyphens, spaces) with underscores
+    # CDF allows: letters, numbers, underscores
+    sanitized = ''
+    for char in ext_id:
+        if char.isalnum() or char == '_':
+            sanitized += char
+        else:
+            sanitized += '_'
+    
+    return sanitized
+
+
 def normalize_timestamp(ts) -> Optional[str]:
     """Convert timestamp to ISO 8601 string format required by CDF."""
     if ts is None:
@@ -144,16 +168,24 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         definition = data.get('definition') or data.get('alarm_definition_id')
         if definition:
             if isinstance(definition, str):
-                properties['definition'] = {'space': instance_space, 'externalId': definition}
+                sanitized_def = sanitize_external_id(definition)
+                properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
             elif isinstance(definition, dict):
+                # Sanitize externalId if present in dict
+                if 'externalId' in definition:
+                    definition['externalId'] = sanitize_external_id(definition['externalId'])
                 properties['definition'] = definition
         
         # Source system (CogniteSourceable)
         source = data.get('source')
         if source:
             if isinstance(source, str):
-                properties['source'] = {'space': instance_space, 'externalId': source}
+                sanitized_source = sanitize_external_id(source)
+                properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
             elif isinstance(source, dict):
+                # Sanitize externalId if present in dict
+                if 'externalId' in source:
+                    source['externalId'] = sanitize_external_id(source['externalId'])
                 properties['source'] = source
         
     elif 'AlarmFrame' in view_external_id:
@@ -183,8 +215,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         definition = data.get('definition') or data.get('alarm_definition_id')
         if definition:
             if isinstance(definition, str):
-                properties['definition'] = {'space': instance_space, 'externalId': definition}
+                sanitized_def = sanitize_external_id(definition)
+                properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
             elif isinstance(definition, dict):
+                # Sanitize externalId if present in dict
+                if 'externalId' in definition:
+                    definition['externalId'] = sanitize_external_id(definition['externalId'])
                 properties['definition'] = definition
         
         # assets relationship (list)
@@ -193,8 +229,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
             asset_refs = []
             for asset in assets:
                 if isinstance(asset, str):
-                    asset_refs.append({'space': instance_space, 'externalId': asset})
+                    sanitized_asset = sanitize_external_id(asset)
+                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
                 elif isinstance(asset, dict):
+                    # Sanitize externalId if present in dict
+                    if 'externalId' in asset:
+                        asset['externalId'] = sanitize_external_id(asset['externalId'])
                     asset_refs.append(asset)
             if asset_refs:
                 properties['assets'] = asset_refs
@@ -203,8 +243,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         source = data.get('source')
         if source:
             if isinstance(source, str):
-                properties['source'] = {'space': instance_space, 'externalId': source}
+                sanitized_source = sanitize_external_id(source)
+                properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
             elif isinstance(source, dict):
+                # Sanitize externalId if present in dict
+                if 'externalId' in source:
+                    source['externalId'] = sanitize_external_id(source['externalId'])
                 properties['source'] = source
     
     else:
@@ -298,6 +342,12 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             safe_topic = topic.replace('/', '_')
             external_id = f"{safe_topic}_{start_time_ms}"
             logger.debug(f"Generated external_id: {external_id}")
+        
+        # Sanitize external_id to meet CDF naming requirements
+        original_ext_id = external_id
+        external_id = sanitize_external_id(external_id)
+        if external_id != original_ext_id:
+            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData

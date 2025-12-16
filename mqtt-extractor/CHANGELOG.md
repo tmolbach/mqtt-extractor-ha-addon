@@ -1,5 +1,16 @@
 ### Changelog
 
+**0.8.3** - 2025-12-16
+- **CRITICAL FIX:** Sanitize external IDs to meet CDF naming requirements
+- External IDs must start with a letter (a-zA-Z), not a number
+- External IDs can only contain letters, numbers, and underscores (no dots, hyphens, etc.)
+- Automatically prefixes `alarm_` to external IDs that start with numbers (e.g., `75_site` → `alarm_75_site`)
+- Replaces invalid characters (dots, hyphens, spaces) with underscores
+- Applied to all external IDs: alarm events, alarm frames, definitions, assets, sources
+- Fixes: "identifier must match regex pattern ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$" errors
+- Affects both `event.py` and `datamodel.py` handlers
+- DEBUG logging shows before/after when sanitization is applied
+
 **0.8.2** - 2025-12-16
 - Fixed event handler to support `eventType` field in addition to `type` field
 - Alarm payloads can now use either `"type": "ALARM_START"` or `"eventType": "ALARM_START"`
