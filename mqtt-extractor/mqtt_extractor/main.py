@@ -719,6 +719,20 @@ def main():
 
                     # Add to TS upload queue
                     if time_stamp is not None and value is not None:
+                        # Validate that value is numeric
+                        if not isinstance(value, (int, float)):
+                            logger.warning("Skipping non-numeric value for %s: value=%r (type=%s)", 
+                                         external_id, value, type(value).__name__)
+                            continue
+                        
+                        # Additional validation: check for NaN and infinity
+                        if isinstance(value, float):
+                            import math
+                            if math.isnan(value) or math.isinf(value):
+                                logger.warning("Skipping invalid float value for %s: value=%r", 
+                                             external_id, value)
+                                continue
+                        
                         # When using data models, we need to use instance_id with NodeId
                         if config.target and config.target.instance_space:
                             # Buffer data points for data model time series
@@ -776,6 +790,12 @@ def main():
                             data_model_buffer.clear()
                     except Exception as e:
                         logger.error("Failed to upload datapoints to data model: %s", e)
+                        # Log the failed items for debugging
+                        for item in to_insert:
+                            ext_id = item["instance_id"].external_id
+                            logger.error("  Failed item: %s with %d datapoints", ext_id, len(item["datapoints"]))
+                            for ts, val in item["datapoints"][:3]:  # Show first 3 datapoints
+                                logger.error("    -> ts=%d, value=%r (type=%s)", ts, val, type(val).__name__)
                         logger.debug("Full traceback:", exc_info=True)
                         data_model_buffer.clear()
 

@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.8.1** - 2025-12-16
+- **CRITICAL FIX:** Added validation to reject non-numeric values before uploading to CDF time series
+- Now validates that values are `int` or `float` before buffering for data model uploads
+- Added validation to reject `NaN` and `Infinity` float values
+- Improved error logging to show which time series and values caused upload failures
+- Prevents "Failed to parse parameter 'items[0].datapoints[0].value'" errors from CDF
+- Added warning messages when skipping invalid values with details (value, type)
+
 **0.8.0** - 2025-12-16
 - **NEW: Generic Data Model Write Handler** - Flexible topic-to-view mapping for any CDF data model view
 - Added `data_model_writes` configuration array for routing MQTT topics to specific views
