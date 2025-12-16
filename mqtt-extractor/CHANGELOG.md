@@ -1,5 +1,14 @@
 ### Changelog
 
+**0.8.2** - 2025-12-16
+- Fixed event handler to support `eventType` field in addition to `type` field
+- Alarm payloads can now use either `"type": "ALARM_START"` or `"eventType": "ALARM_START"`
+- Changed non-event payload warning to DEBUG level (e.g., when alarm frames are received by event handler)
+- Eliminates "Invalid or missing event type" warnings when using new alarm payload format
+- Both old and new payload formats now work with event.py handler
+- Gracefully skips alarm frames and other non-event payloads without warnings
+- Note: Consider migrating to `data_model_writes` for unified alarm handling (supports events and frames)
+
 **0.8.1** - 2025-12-16
 - **CRITICAL FIX:** Added validation to reject non-numeric values before uploading to CDF time series
 - Now validates that values are `int` or `float` before buffering for data model uploads

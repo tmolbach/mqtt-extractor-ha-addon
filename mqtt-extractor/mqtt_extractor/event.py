@@ -54,10 +54,11 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug("Payload is not a JSON object for topic %s, skipping", topic)
             return
 
-        # Extract required fields
-        event_type = data.get('type')
+        # Extract required fields (support both 'type' and 'eventType')
+        event_type = data.get('type') or data.get('eventType')
         if event_type not in ['ALARM_START', 'ALARM_END']:
-            logger.warning("Invalid or missing event type for topic %s: %s", topic, event_type)
+            # This is expected for alarm frames or other non-event payloads
+            logger.debug("Skipping non-event payload for topic %s: eventType=%s", topic, event_type)
             return
 
         # Get alarm event handler config (set by main.py)
