@@ -1,5 +1,23 @@
 ### Changelog
 
+**0.8.0** - 2025-12-16
+- **NEW: Generic Data Model Write Handler** - Flexible topic-to-view mapping for any CDF data model view
+- Added `data_model_writes` configuration array for routing MQTT topics to specific views
+- Each mapping specifies: topic pattern, view_external_id, instance_space, data_model_space, data_model_version
+- Supports wildcard patterns (# and +) for flexible topic matching
+- Built-in support for `haAlarmEvent` and `haAlarmFrame` views with proper field mapping
+- Generic fallback for other views with automatic timestamp conversion and relationship handling
+- Enables multiple alarm handlers (events, frames, logs) via configuration instead of code
+- Examples:
+  - `events/alarms/log → haAlarmEvent` for alarm occurrences
+  - `events/alarms/frame → haAlarmFrame` for alarm summary periods
+  - Extensible to any custom views in your data model
+- Automatic external ID generation from topic + timestamp if not provided
+- Comprehensive DEBUG logging for payload parsing and property mapping
+- Supports both camelCase and snake_case field names in payloads
+- Auto-conversion of timestamps to ISO 8601 format for CDF
+- Asset relationship support (arrays of asset external IDs)
+
 **0.7.3** - 2025-11-30
 - Added support for asset references in alarm event payloads
 - Fixed property handling to avoid sending null/None values to CDF

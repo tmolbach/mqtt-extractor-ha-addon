@@ -82,6 +82,15 @@ class AlarmEventConfig:
     source_system: str = "MQTT"
 
 @dataclass
+class DataModelWriteConfig:
+    """Configuration for flexible topic-to-view mapping."""
+    topic: str  # MQTT topic pattern (exact or wildcard)
+    view_external_id: str  # Target view external ID (e.g., "haAlarmEvent", "haAlarmFrame")
+    instance_space: str  # CDF instance space for nodes
+    data_model_space: str = "sp_enterprise_schema_space"
+    data_model_version: str = "v1"
+
+@dataclass
 class Config(BaseConfig):
     mqtt: MqttConfig
     subscriptions: List[Subscription]
@@ -92,6 +101,7 @@ class Config(BaseConfig):
     target: TargetConfig = None
     workflow: WorkflowConfig = None
     alarm_events: AlarmEventConfig = None
+    data_model_writes: List[DataModelWriteConfig] = None  # Flexible topic-to-view mapping
     max_datapoints: int = None  # Stop after this many datapoints (for testing)
     external_id_prefix: str = "mqtt:"  # Prefix on external ID used when creating CDF resources
 
@@ -498,6 +508,22 @@ def main():
         logger.info("Alarm event handler enabled: view=%s/%s (space=%s)", 
                    config.alarm_events.data_model_space, config.alarm_events.view_external_id,
                    config.alarm_events.instance_space)
+    
+    # Configure flexible data model writes (topic-to-view mapping)
+    if config.data_model_writes:
+        from . import datamodel
+        for write_config in config.data_model_writes:
+            topic_pattern = write_config.topic
+            datamodel.data_model_writes_config[topic_pattern] = {
+                'topic': topic_pattern,
+                'view_external_id': write_config.view_external_id,
+                'instance_space': write_config.instance_space,
+                'data_model_space': write_config.data_model_space,
+                'data_model_version': write_config.data_model_version,
+            }
+            logger.info("Data model write configured: %s -> %s/%s (space=%s)",
+                       topic_pattern, write_config.data_model_space, 
+                       write_config.view_external_id, write_config.instance_space)
     
     # Ensure CogniteSourceSystem 'MQTT' exists in the instance space
     if config.target and config.target.instance_space:

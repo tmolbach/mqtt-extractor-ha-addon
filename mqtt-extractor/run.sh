@@ -109,6 +109,13 @@ ALARM_EVENT_DATA_MODEL_SPACE=$(get_config 'alarm_event_data_model_space' 'sp_ent
 ALARM_EVENT_DATA_MODEL_VERSION=$(get_config 'alarm_event_data_model_version' 'v1')
 ALARM_EVENT_SOURCE_SYSTEM=$(get_config 'alarm_event_source_system' 'MQTT')
 
+# Get data model writes configuration (flexible topic-to-view mapping)
+if command -v bashio::config >/dev/null 2>&1; then
+    DATA_MODEL_WRITES=$(bashio::config 'data_model_writes' 2>/dev/null || echo '[]')
+else
+    DATA_MODEL_WRITES='[]'
+fi
+
 # Create config.yaml from Home Assistant options
 cat > "$CONFIG_FILE" <<EOF
 version: 1
@@ -317,6 +324,32 @@ EOF
     done
 fi
 
+# Process data model writes topics - add subscriptions for flexible topic-to-view mapping
+# These use the mqtt_extractor.datamodel handler
+if [ "${DATA_MODEL_WRITES}" != "[]" ] && [ -n "${DATA_MODEL_WRITES}" ]; then
+    # Extract topics from data_model_writes array and add subscriptions
+    echo "${DATA_MODEL_WRITES}" | python3 -c "
+import sys
+import json
+
+data = json.load(sys.stdin)
+if isinstance(data, list):
+    for item in data:
+        topic = item.get('topic', '')
+        if topic:
+            print(topic)
+" | while read -r topic; do
+        if [ -n "${topic}" ]; then
+            cat >> "$CONFIG_FILE" <<EOF
+  - topic: "${topic}"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.datamodel
+EOF
+        fi
+    done
+fi
+
 # Add remaining configuration
 cat >> "$CONFIG_FILE" <<EOF
 
@@ -389,6 +422,42 @@ alarm-events:
   source-system: "${ALARM_EVENT_SOURCE_SYSTEM}"
 EOF
     echo "[Startup 77%] Alarm event configuration added"
+fi
+
+# Add data model writes configuration if provided (flexible topic-to-view mapping)
+# This allows routing different MQTT topics to different CDF data model views
+if [ "${DATA_MODEL_WRITES}" != "[]" ] && [ -n "${DATA_MODEL_WRITES}" ]; then
+    # Check if there are any entries in the array
+    WRITE_COUNT=$(echo "${DATA_MODEL_WRITES}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d, list) else 0)" 2>/dev/null || echo "0")
+    
+    if [ "${WRITE_COUNT}" -gt "0" ]; then
+        echo "" >> "$CONFIG_FILE"
+        echo "data-model-writes:" >> "$CONFIG_FILE"
+        
+        # Parse the JSON array and write each entry
+        echo "${DATA_MODEL_WRITES}" | python3 -c "
+import sys
+import json
+
+data = json.load(sys.stdin)
+if isinstance(data, list):
+    for item in data:
+        topic = item.get('topic', '')
+        view_external_id = item.get('view_external_id', '')
+        instance_space = item.get('instance_space', '')
+        data_model_space = item.get('data_model_space', 'sp_enterprise_schema_space')
+        data_model_version = item.get('data_model_version', 'v1')
+        
+        if topic and view_external_id and instance_space:
+            print(f'  - topic: \"{topic}\"')
+            print(f'    view-external-id: \"{view_external_id}\"')
+            print(f'    instance-space: \"{instance_space}\"')
+            print(f'    data-model-space: \"{data_model_space}\"')
+            print(f'    data-model-version: \"{data_model_version}\"')
+" >> "$CONFIG_FILE"
+        
+        echo "[Startup 78%] Data model writes configuration added (${WRITE_COUNT} topic mappings)"
+    fi
 fi
 
 # Progress indicator: Finalizing configuration
