@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.8.4** - 2025-12-16
+- **CRITICAL FIX:** Convert Python boolean values (True/False) to integers (1/0) before uploading to CDF
+- Python booleans are a subclass of int, so they passed validation but CDF API rejected them
+- Now explicitly checks for bool type first and converts: True→1, False→0
+- Adds DEBUG logging when boolean conversion occurs
+- Fixes: "Failed to parse parameter 'items[0].datapoints[0].value'" errors for boolean values
+- Prevents handler bugs from causing upload failures
+
 **0.8.3** - 2025-12-16
 - **CRITICAL FIX:** Sanitize external IDs to meet CDF naming requirements
 - External IDs must start with a letter (a-zA-Z), not a number

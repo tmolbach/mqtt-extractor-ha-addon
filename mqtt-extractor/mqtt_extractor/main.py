@@ -719,6 +719,12 @@ def main():
 
                     # Add to TS upload queue
                     if time_stamp is not None and value is not None:
+                        # Convert boolean to int (True->1, False->0)
+                        # Note: bool is a subclass of int in Python, so check for bool explicitly first
+                        if isinstance(value, bool):
+                            logger.debug("Converting boolean to int for %s: %r -> %d", external_id, value, int(value))
+                            value = int(value)
+                        
                         # Validate that value is numeric
                         if not isinstance(value, (int, float)):
                             logger.warning("Skipping non-numeric value for %s: value=%r (type=%s)", 
