@@ -1,5 +1,15 @@
 ### Changelog
 
+**0.8.5** - 2025-12-16
+- **NEW:** Add support for `property` field in alarm payloads as asset reference
+- Property field (singular) is now automatically added to the `assets` relationship array
+- Properties represent physical assets/locations where alarms occur
+- Works for both alarm events and alarm frames
+- Sanitizes property IDs to meet CDF naming requirements (prefixes numbers with `alarm_`)
+- Both `property` (singular) and `assets` (array) fields are supported
+- Example: `"property": "75_nsunkenmeadow"` → creates asset reference to `alarm_75_nsunkenmeadow`
+- Applied to both `event.py` and `datamodel.py` handlers
+
 **0.8.4** - 2025-12-16
 - **CRITICAL FIX:** Convert Python boolean values (True/False) to integers (1/0) before uploading to CDF
 - Python booleans are a subclass of int, so they passed validation but CDF API rejected them

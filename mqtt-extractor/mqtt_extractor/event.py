@@ -216,10 +216,19 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             }
         
         # Add asset references if provided in payload
+        asset_refs = []
+        
+        # Check for 'property' field (singular asset reference)
+        if 'property' in data:
+            property_id = data.get('property')
+            if property_id:
+                sanitized_property_id = sanitize_external_id(property_id)
+                asset_refs.append({'space': instance_space, 'externalId': sanitized_property_id})
+                logger.debug(f"Added property as asset reference: {property_id} -> {sanitized_property_id}")
+        
+        # Also check for 'assets' array (for backward compatibility or multiple assets)
         assets = data.get('assets', [])
         if assets and isinstance(assets, list):
-            # Convert asset external IDs to NodeId references
-            asset_refs = []
             for asset in assets:
                 if isinstance(asset, str):
                     sanitized_asset_id = sanitize_external_id(asset)
@@ -230,9 +239,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                         'space': asset.get('space', instance_space),
                         'externalId': sanitized_asset_id
                     })
-            if asset_refs:
-                properties['assets'] = asset_refs
-                logger.debug(f"Added {len(asset_refs)} asset references to alarm event")
+        
+        if asset_refs:
+            properties['assets'] = asset_refs
+            logger.debug(f"Total asset references added to alarm event: {len(asset_refs)}")
 
         # Add source system reference if configured
         source_system = alarm_config.get('source_system', 'MQTT')

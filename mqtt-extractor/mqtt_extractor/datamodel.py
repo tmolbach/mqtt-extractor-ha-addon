@@ -188,6 +188,31 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
                     source['externalId'] = sanitize_external_id(source['externalId'])
                 properties['source'] = source
         
+        # Asset references
+        asset_refs = []
+        
+        # Check for 'property' field (singular asset reference)
+        if 'property' in data:
+            property_id = data.get('property')
+            if property_id:
+                sanitized_property = sanitize_external_id(property_id)
+                asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
+        
+        # Also check for 'assets' array (for backward compatibility or multiple assets)
+        assets = data.get('assets', [])
+        if assets and isinstance(assets, list):
+            for asset in assets:
+                if isinstance(asset, str):
+                    sanitized_asset = sanitize_external_id(asset)
+                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
+                elif isinstance(asset, dict):
+                    if 'externalId' in asset:
+                        asset['externalId'] = sanitize_external_id(asset['externalId'])
+                    asset_refs.append(asset)
+        
+        if asset_refs:
+            properties['assets'] = asset_refs
+        
     elif 'AlarmFrame' in view_external_id:
         # Map for AlarmFrame view
         # CogniteDescribable: name, description
@@ -223,10 +248,19 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
                     definition['externalId'] = sanitize_external_id(definition['externalId'])
                 properties['definition'] = definition
         
-        # assets relationship (list)
+        # Asset references
+        asset_refs = []
+        
+        # Check for 'property' field (singular asset reference)
+        if 'property' in data:
+            property_id = data.get('property')
+            if property_id:
+                sanitized_property = sanitize_external_id(property_id)
+                asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
+        
+        # Also check for 'assets' array (for backward compatibility or multiple assets)
         assets = data.get('assets', [])
-        if assets:
-            asset_refs = []
+        if assets and isinstance(assets, list):
             for asset in assets:
                 if isinstance(asset, str):
                     sanitized_asset = sanitize_external_id(asset)
@@ -236,8 +270,9 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
                     if 'externalId' in asset:
                         asset['externalId'] = sanitize_external_id(asset['externalId'])
                     asset_refs.append(asset)
-            if asset_refs:
-                properties['assets'] = asset_refs
+        
+        if asset_refs:
+            properties['assets'] = asset_refs
         
         # Source system (CogniteSourceable)
         source = data.get('source')
