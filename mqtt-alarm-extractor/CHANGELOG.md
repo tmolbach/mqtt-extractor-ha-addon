@@ -2,6 +2,13 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.9] - 2025-12-17
+
+### Fixed
+- Fix _on_disconnect callback signature to handle variable arguments (MQTTv5 compatibility)
+- Add graceful shutdown summary showing events/frames received and written
+- Prevent TypeError on disconnect
+
 ## [1.0.8] - 2025-12-17
 
 ### Changed
