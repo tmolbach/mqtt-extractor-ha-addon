@@ -52,6 +52,7 @@ class Config:
     mqtt_qos: int
     
     # Data model settings
+    instance_space: str
     data_model_space: str
     data_model_version: str
     
@@ -81,6 +82,7 @@ def load_config(config_path: str = "/app/config.yaml") -> Config:
         mqtt_username=data['mqtt'].get('username', ''),
         mqtt_password=data['mqtt'].get('password', ''),
         mqtt_qos=data['mqtt'].get('qos', 1),
+        instance_space=data.get('instance_space', 'ha_instances'),
         data_model_space=data['data_model']['space'],
         data_model_version=data['data_model']['version'],
         subscriptions=data.get('subscriptions', []),
@@ -137,7 +139,7 @@ class MQTTAlarmExtractor:
         # Create handler
         self.handler = AlarmHandler(
             client=cdf_client,
-            instance_space=config.data_model_space,
+            instance_space=config.instance_space,
             data_model_space=config.data_model_space,
             data_model_version=config.data_model_version
         )

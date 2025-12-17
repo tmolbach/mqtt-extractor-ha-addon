@@ -2,6 +2,16 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.7] - 2025-12-17
+
+### Fixed
+- Separate instance_space and data_model_space configuration
+- Default instance_space: ha_instances (where nodes are stored)
+- Default data_model_space: sp_enterprise_schema_space (where views are defined)
+- ViewId uses data_model_space
+- Node references (source, definition, assets) use instance_space
+- NodeApply uses instance_space
+
 ## [1.0.6] - 2025-12-17
 
 ### Fixed

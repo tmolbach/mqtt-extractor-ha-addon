@@ -38,7 +38,8 @@ MQTT_USERNAME=$(get_config 'mqtt_username' '')
 MQTT_PASSWORD=$(get_config 'mqtt_password' '')
 MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
-DATA_MODEL_SPACE=$(bashio::config 'data_model_space' 2>/dev/null || echo "")
+INSTANCE_SPACE=$(get_config 'instance_space' 'ha_instances')
+DATA_MODEL_SPACE=$(get_config 'data_model_space' 'sp_enterprise_schema_space')
 DATA_MODEL_VERSION=$(get_config 'data_model_version' 'v1')
 
 ALARM_EVENT_TOPIC=$(get_config 'alarm_event_topic' 'events/alarms/log')
@@ -52,14 +53,16 @@ if command -v bashio::log.info >/dev/null 2>&1; then
     bashio::log.info "Starting MQTT Alarm Extractor for Cognite..."
     bashio::log.info "  Project: ${COGNITE_PROJECT}"
     bashio::log.info "  Cluster: ${COGNITE_CLUSTER}"
-    bashio::log.info "  Space: ${DATA_MODEL_SPACE}"
+    bashio::log.info "  Instance Space: ${INSTANCE_SPACE}"
+    bashio::log.info "  Data Model Space: ${DATA_MODEL_SPACE}"
     bashio::log.info "  Event topic: ${ALARM_EVENT_TOPIC} -> ${ALARM_EVENT_VIEW}"
     bashio::log.info "  Frame topic: ${ALARM_FRAME_TOPIC} -> ${ALARM_FRAME_VIEW}"
 else
     echo "Starting MQTT Alarm Extractor for Cognite..."
     echo "  Project: ${COGNITE_PROJECT}"
     echo "  Cluster: ${COGNITE_CLUSTER}"
-    echo "  Space: ${DATA_MODEL_SPACE}"
+    echo "  Instance Space: ${INSTANCE_SPACE}"
+    echo "  Data Model Space: ${DATA_MODEL_SPACE}"
     echo "  Event topic: ${ALARM_EVENT_TOPIC} -> ${ALARM_EVENT_VIEW}"
     echo "  Frame topic: ${ALARM_FRAME_TOPIC} -> ${ALARM_FRAME_VIEW}"
 fi
@@ -84,6 +87,7 @@ mqtt:
   password: "${MQTT_PASSWORD}"
   qos: ${MQTT_QOS}
 
+instance_space: "${INSTANCE_SPACE}"
 data_model:
   space: "${DATA_MODEL_SPACE}"
   version: "${DATA_MODEL_VERSION}"
