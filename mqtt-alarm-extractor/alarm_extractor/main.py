@@ -257,13 +257,13 @@ class MQTTAlarmExtractor:
         
         # Final summary
         stats = self.handler.stats
-        logger.info("=" * 60)
-        logger.info("Shutdown Summary:")
-        logger.info(f"  Alarm Events: {stats['events_written']}/{stats['events_received']} written/received")
-        logger.info(f"  Alarm Frames: {stats['frames_written']}/{stats['frames_received']} written/received")
+        logger.info("")
+        logger.info("MQTT Alarm Extractor - Stopped")
+        logger.info("Final Statistics:")
+        logger.info("  Alarm Events: %d/%d written/received", stats['events_written'], stats['events_received'])
+        logger.info("  Alarm Frames: %d/%d written/received", stats['frames_written'], stats['frames_received'])
         if stats['errors'] > 0:
-            logger.warning(f"  Errors: {stats['errors']}")
-        logger.info("=" * 60)
+            logger.info("  Errors: %d", stats['errors'])
 
 
 def main():

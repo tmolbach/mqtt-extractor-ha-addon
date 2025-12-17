@@ -2,6 +2,13 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.10] - 2025-12-17
+
+### Fixed
+- Fix shutdown summary formatting to match mqtt-extractor style
+- Remove equals signs separator (was causing large fonts in HA log viewer)
+- Use simple format matching existing extractor
+
 ## [1.0.9] - 2025-12-17
 
 ### Fixed
