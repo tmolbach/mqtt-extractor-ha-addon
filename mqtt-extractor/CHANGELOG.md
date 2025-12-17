@@ -1,5 +1,17 @@
 ### Changelog
 
+**0.9.1** - 2025-12-16
+- **CRITICAL FIX:** Re-implement proper external ID sanitization with correct CDF rules
+- External IDs MUST match pattern: `^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$`
+- Must start with a letter (not a number)
+- Can only contain letters, numbers, and underscores (dots NOT allowed)
+- Must end with a letter or number (not underscore)
+- Use "hal_" prefix for Home Assistant alarm IDs (instead of "alarm_")
+- Replace all dots (.) with underscores (_)
+- Strip trailing underscores
+- Applied to all external IDs: events, definitions, assets, sources
+- Example: `75_nsunkenmeadow_alarmdef_binary_sensor.75_la_ws03` → `hal_75_nsunkenmeadow_alarmdef_binary_sensor_75_la_ws03`
+
 **0.9.0** - 2025-12-16
 - **BREAKING CHANGE:** Removed external ID sanitization - now using MQTT payload IDs directly
 - External IDs in CDF do NOT require regex pattern matching (can contain dots, start with numbers, etc.)
