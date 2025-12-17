@@ -2,6 +2,14 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.5] - 2025-12-17
+
+### Fixed
+- Fix run.sh shebang to use `#!/bin/bash` instead of `#!/usr/bin/with-contenv bashio`
+- Source bashio manually like other working add-ons
+- Add error handling for bashio commands
+- Fixes s6-overlay-suexec and s6-envdir errors
+
 ## [1.0.4] - 2025-12-17
 
 ### Fixed

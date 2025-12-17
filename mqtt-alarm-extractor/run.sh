@@ -1,43 +1,68 @@
-#!/usr/bin/with-contenv bashio
-# ==============================================================================
-# HA MQTT Alarm Extractor for Cognite
-# Generates config.yaml from Home Assistant add-on options and starts extractor
-# ==============================================================================
-
+#!/bin/bash
 set -e
+
+# Source bashio if available
+if [ -f /usr/lib/bashio/bashio.sh ]; then
+    . /usr/lib/bashio/bashio.sh
+fi
 
 CONFIG_FILE="/app/config.yaml"
 
+# Helper function to get config with default
+get_config() {
+    local key=$1
+    local default=$2
+    if command -v bashio::config >/dev/null 2>&1; then
+        local value=$(bashio::config "${key}" 2>/dev/null || echo "")
+    else
+        local value=""
+    fi
+    if [ -z "${value}" ]; then
+        echo "${default}"
+    else
+        echo "${value}"
+    fi
+}
+
 # Read configuration from Home Assistant add-on options
-COGNITE_PROJECT=$(bashio::config 'cognite_project')
-COGNITE_CLUSTER=$(bashio::config 'cognite_cluster')
-COGNITE_CLIENT_ID=$(bashio::config 'cognite_client_id')
-COGNITE_CLIENT_SECRET=$(bashio::config 'cognite_client_secret')
-COGNITE_TOKEN_URL=$(bashio::config 'cognite_token_url')
-COGNITE_SCOPES=$(bashio::config 'cognite_scopes')
+COGNITE_PROJECT=$(bashio::config 'cognite_project' 2>/dev/null || echo "")
+COGNITE_CLUSTER=$(get_config 'cognite_cluster' 'az-eastus-1')
+COGNITE_CLIENT_ID=$(bashio::config 'cognite_client_id' 2>/dev/null || echo "")
+COGNITE_CLIENT_SECRET=$(bashio::config 'cognite_client_secret' 2>/dev/null || echo "")
+COGNITE_TOKEN_URL=$(bashio::config 'cognite_token_url' 2>/dev/null || echo "")
+COGNITE_SCOPES=$(get_config 'cognite_scopes' 'https://az-eastus-1.cognitedata.com/.default')
 
-MQTT_HOST=$(bashio::config 'mqtt_host')
-MQTT_PORT=$(bashio::config 'mqtt_port')
-MQTT_USERNAME=$(bashio::config 'mqtt_username')
-MQTT_PASSWORD=$(bashio::config 'mqtt_password')
-MQTT_QOS=$(bashio::config 'mqtt_qos')
+MQTT_HOST=$(get_config 'mqtt_host' 'homeassistant.local')
+MQTT_PORT=$(get_config 'mqtt_port' '1883')
+MQTT_USERNAME=$(get_config 'mqtt_username' '')
+MQTT_PASSWORD=$(get_config 'mqtt_password' '')
+MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
-DATA_MODEL_SPACE=$(bashio::config 'data_model_space')
-DATA_MODEL_VERSION=$(bashio::config 'data_model_version')
+DATA_MODEL_SPACE=$(bashio::config 'data_model_space' 2>/dev/null || echo "")
+DATA_MODEL_VERSION=$(get_config 'data_model_version' 'v1')
 
-ALARM_EVENT_TOPIC=$(bashio::config 'alarm_event_topic')
-ALARM_EVENT_VIEW=$(bashio::config 'alarm_event_view')
-ALARM_FRAME_TOPIC=$(bashio::config 'alarm_frame_topic')
-ALARM_FRAME_VIEW=$(bashio::config 'alarm_frame_view')
+ALARM_EVENT_TOPIC=$(get_config 'alarm_event_topic' 'events/alarms/log')
+ALARM_EVENT_VIEW=$(get_config 'alarm_event_view' 'haAlarmEvent')
+ALARM_FRAME_TOPIC=$(get_config 'alarm_frame_topic' 'events/alarms/frame')
+ALARM_FRAME_VIEW=$(get_config 'alarm_frame_view' 'haAlarmFrame')
 
-LOG_LEVEL=$(bashio::config 'log_level')
+LOG_LEVEL=$(get_config 'log_level' 'INFO')
 
-bashio::log.info "Starting MQTT Alarm Extractor for Cognite..."
-bashio::log.info "  Project: ${COGNITE_PROJECT}"
-bashio::log.info "  Cluster: ${COGNITE_CLUSTER}"
-bashio::log.info "  Space: ${DATA_MODEL_SPACE}"
-bashio::log.info "  Event topic: ${ALARM_EVENT_TOPIC} -> ${ALARM_EVENT_VIEW}"
-bashio::log.info "  Frame topic: ${ALARM_FRAME_TOPIC} -> ${ALARM_FRAME_VIEW}"
+if command -v bashio::log.info >/dev/null 2>&1; then
+    bashio::log.info "Starting MQTT Alarm Extractor for Cognite..."
+    bashio::log.info "  Project: ${COGNITE_PROJECT}"
+    bashio::log.info "  Cluster: ${COGNITE_CLUSTER}"
+    bashio::log.info "  Space: ${DATA_MODEL_SPACE}"
+    bashio::log.info "  Event topic: ${ALARM_EVENT_TOPIC} -> ${ALARM_EVENT_VIEW}"
+    bashio::log.info "  Frame topic: ${ALARM_FRAME_TOPIC} -> ${ALARM_FRAME_VIEW}"
+else
+    echo "Starting MQTT Alarm Extractor for Cognite..."
+    echo "  Project: ${COGNITE_PROJECT}"
+    echo "  Cluster: ${COGNITE_CLUSTER}"
+    echo "  Space: ${DATA_MODEL_SPACE}"
+    echo "  Event topic: ${ALARM_EVENT_TOPIC} -> ${ALARM_EVENT_VIEW}"
+    echo "  Frame topic: ${ALARM_FRAME_TOPIC} -> ${ALARM_FRAME_VIEW}"
+fi
 
 # Generate config.yaml
 cat > "$CONFIG_FILE" <<EOF
@@ -72,12 +97,21 @@ subscriptions:
 log_level: "${LOG_LEVEL}"
 EOF
 
-bashio::log.info "Configuration generated successfully"
+if command -v bashio::log.info >/dev/null 2>&1; then
+    bashio::log.info "Configuration generated successfully"
+else
+    echo "Configuration generated successfully"
+fi
 
 # Activate virtual environment and start extractor
 cd /app
 source /app/venv/bin/activate
 
-bashio::log.info "Starting alarm extractor..."
+if command -v bashio::log.info >/dev/null 2>&1; then
+    bashio::log.info "Starting alarm extractor..."
+else
+    echo "Starting alarm extractor..."
+fi
+
 exec python -m alarm_extractor.main
 
