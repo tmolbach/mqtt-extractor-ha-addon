@@ -1,5 +1,15 @@
 ### Changelog
 
+**1.0.0** - 2025-12-16
+- **FIX:** Added mandatory `eventType` field to alarm events (ACTIVATED/CLEARED)
+- Restored full alarm event property population with all fields
+- Cleaned up excessive INFO logging - moved per-item logs to DEBUG
+- "Matched" logs moved to DEBUG level
+- Alarm event write success moved to DEBUG level
+- Status summary remains at INFO level for periodic updates
+- AlarmFrame handler unchanged (no eventType needed for frames)
+- Successfully writing alarm events and frames to CDF!
+
 **0.9.6-test** - 2025-12-16
 - **TEST:** Minimal alarm event write test - only writes external_id 'test123' with name and description
 - All complex property population commented out to isolate CDF write issue

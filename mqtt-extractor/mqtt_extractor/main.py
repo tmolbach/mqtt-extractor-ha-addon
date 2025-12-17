@@ -668,7 +668,7 @@ def main():
                         if mqtt_topic_matches(message.topic, pattern):
                             handle = handler
                             matched_pattern = pattern
-                            logger.info("Matched: %s -> %s", message.topic, pattern)
+                            logger.debug("Matched: %s -> %s", message.topic, pattern)
                             break
                     
                     if not handle:

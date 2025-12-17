@@ -206,15 +206,12 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 external_id = f"{external_id_prefix}{start_time_ms}"
         
         # Sanitize external_id to meet CDF naming requirements (alarm event)
-        original_ext_id = external_id
         external_id = sanitize_external_id(external_id, prefix="hal_")
-        if external_id != original_ext_id:
-            logger.info(f"Sanitized alarm event external_id: {original_ext_id} -> {external_id}")
-
-        logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
-        logger.info(f"Alarm event external ID (sanitized): {external_id}")
-        logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
-        logger.debug(f"Full alarm event data: {json.dumps(data, indent=2, default=str)}")
+        
+        logger.debug(f"Processing {event_type}: {external_id}")
+        logger.debug(f"Alarm definition: {alarm_definition_id}")
+        logger.debug(f"Timestamps: start={start_time}, end={end_time}")
+        logger.debug(f"Full payload: {json.dumps(data, indent=2, default=str)}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData, NodeId
@@ -230,44 +227,110 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             version=data_model_version
         )
 
-        # MINIMAL TEST - Include mandatory eventType field
-        logger.warning("USING MINIMAL TEST MODE - Only writing name, description, eventType, and assets")
-        logger.warning(f"ViewId: space={data_model_space}, external_id={view_external_id}, version={data_model_version}")
-        logger.warning(f"Instance space: {instance_space}")
-        
-        # Map ALARM_START/ALARM_END to CDF eventType values
+        # Map ALARM_START/ALARM_END to CDF eventType values (mandatory field)
         cdf_event_type = "ACTIVATED" if event_type == "ALARM_START" else "CLEARED"
-        logger.warning(f"Mapping {event_type} -> eventType: {cdf_event_type}")
         
-        # Use exact same pattern as the validated example
+        # Prepare properties for the alarm event
+        # Use name and description from payload if available
+        event_name = data.get('name') or message or f"Alarm occurrence {external_id}"
+        event_description = data.get('description') or (f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event")
+        
+        # Use source from payload for sourceContext (free-form string)
+        source_context = data.get('source', 'MQTT')
+        
+        properties = {
+            'name': event_name,
+            'description': event_description,
+            'eventType': cdf_event_type,  # Mandatory: ACTIVATED or CLEARED
+            'sourceContext': source_context,
+            'sourceId': external_id,
+            'startTime': start_time,
+        }
+        
+        # Add valueAtTrigger if available
+        if value_raw is not None:
+            properties['valueAtTrigger'] = str(value_raw)
+        
+        # Add triggerEntity if available
+        if trigger_entity:
+            properties['triggerEntity'] = trigger_entity
+
+        # Add end time if this is an ALARM_END event
+        if event_type == 'ALARM_END' and end_time:
+            properties['endTime'] = end_time
+
+        # Add reference to alarm definition if provided
+        if alarm_definition_id:
+            sanitized_def_id = sanitize_external_id(alarm_definition_id, prefix="had_")
+            properties['definition'] = {
+                'space': instance_space,
+                'externalId': sanitized_def_id
+            }
+        
+        # Add asset references if provided in payload
+        asset_refs = []
+        
+        # Check for 'property' field (singular asset reference)
+        if 'property' in data:
+            property_id = data.get('property')
+            if property_id:
+                sanitized_property_id = sanitize_external_id(property_id, prefix="haa_")
+                asset_refs.append({'space': instance_space, 'externalId': sanitized_property_id})
+        
+        # Also check for 'assets' array (for backward compatibility or multiple assets)
+        assets = data.get('assets', [])
+        if assets and isinstance(assets, list):
+            for asset in assets:
+                if isinstance(asset, str):
+                    sanitized_asset_id = sanitize_external_id(asset, prefix="haa_")
+                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset_id})
+                elif isinstance(asset, dict) and 'externalId' in asset:
+                    sanitized_asset_id = sanitize_external_id(asset['externalId'], prefix="haa_")
+                    asset_refs.append({
+                        'space': asset.get('space', instance_space),
+                        'externalId': sanitized_asset_id
+                    })
+        
+        if asset_refs:
+            properties['assets'] = asset_refs
+
+        # Add source system reference
+        # Source externalId should always be "MQTT" (the actual source value goes in sourceContext)
+        properties['source'] = {
+            'space': instance_space,
+            'externalId': 'MQTT'
+        }
+
+        # Add tags from metadata if available
+        tags = []
+        if 'source' in metadata:
+            tags.append(f"source:{metadata['source']}")
+        if trigger_entity:
+            tags.append(f"entity:{trigger_entity}")
+        if tags:
+            properties['tags'] = tags
+
+        # Create the alarm event node
         node = NodeApply(
             space=instance_space,
-            external_id="test123",
+            external_id=external_id,
             sources=[
                 NodeOrEdgeData(
                     source=view_id,
-                    properties={
-                        "name": "Test Alarm Event 123",
-                        "description": "This is a minimal test alarm event",
-                        "eventType": cdf_event_type,  # Mandatory: ACTIVATED or CLEARED
-                        "assets": [
-                            {"space": instance_space, "externalId": "haa_75_nsunkenmeadow"}
-                        ]
-                    }
+                    properties=properties
                 )
             ],
         )
-        
-        logger.warning(f"Node to send: space={node.space}, external_id={node.external_id}")
-        logger.warning(f"Properties: {node.sources[0].properties if node.sources else 'None'}")
+
+        logger.debug(f"Alarm event properties: {json.dumps(properties, indent=2, default=str)}")
         
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.info(f"✓ SUCCESS: Alarm event test123 written to CDF with eventType={cdf_event_type}")
+            logger.debug(f"Alarm event {cdf_event_type}: {external_id} written to CDF")
         except Exception as e:
             logger.error(f"Failed to write alarm event to CDF: {e}")
-            logger.error(f"Failed for external_id: test123")
-            logger.error(f"ViewId used: {view_id}")
+            logger.error(f"Failed for external_id: {external_id}")
+            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:

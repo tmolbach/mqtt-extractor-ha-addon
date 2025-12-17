@@ -449,11 +449,11 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.info(f"Successfully wrote {view_external_id} node: {external_id}")
+            logger.debug(f"Wrote {view_external_id}: {external_id}")
         except Exception as e:
-            logger.error(f"Failed to write to CDF data model: {e}")
-            logger.debug(f"Failed node: space={instance_space}, external_id={external_id}")
-            logger.debug(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            logger.error(f"Failed to write {view_external_id} to CDF: {e}")
+            logger.error(f"Failed external_id: {external_id}")
+            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:
