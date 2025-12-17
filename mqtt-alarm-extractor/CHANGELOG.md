@@ -2,6 +2,14 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.8] - 2025-12-17
+
+### Changed
+- Move most logging to DEBUG level for cleaner output
+- Keep single polished INFO log line per alarm event/frame showing Name
+- Format: "AlarmEvent: {name}" or "AlarmFrame: {name}"
+- Reduces log verbosity while keeping essential visibility
+
 ## [1.0.7] - 2025-12-17
 
 ### Fixed

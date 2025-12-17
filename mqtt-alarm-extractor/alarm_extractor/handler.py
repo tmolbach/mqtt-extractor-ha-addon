@@ -103,9 +103,15 @@ def write_to_cdf(
         properties.pop('external_id', None)
         properties.pop('externalId', None)
         
-        logger.info(f"Processing {view_external_id}: {external_id}")
-        logger.info(f"  Name: {properties.get('name', 'N/A')}")
-        logger.info(f"  Properties: {json.dumps(properties, default=str)}")
+        # Get name for logging
+        name = properties.get('name', 'N/A')
+        
+        # Single polished log line per alarm event/frame
+        msg_type = "AlarmEvent" if "Event" in view_external_id else "AlarmFrame"
+        logger.info(f"{msg_type}: {name}")
+        
+        logger.debug(f"Processing {view_external_id}: {external_id}")
+        logger.debug(f"Properties: {json.dumps(properties, default=str)}")
         
         # Create node
         view_id = ViewId(
@@ -145,11 +151,11 @@ def write_to_cdf(
         
         # Write to CDF
         result = client.data_modeling.instances.apply(nodes=[node])
-        logger.info(f"  ✓ Written to CDF successfully")
+        logger.debug(f"Written to CDF successfully: {external_id}")
         return True
         
     except Exception as e:
-        logger.error(f"  ✗ Failed to write to CDF: {e}")
+        logger.error(f"Failed to write {view_external_id} to CDF: {e}")
         # Log the full node structure on error
         try:
             node_dict = {
@@ -231,9 +237,7 @@ class AlarmHandler:
             # Parse JSON payload
             payload = json.loads(payload_bytes.decode('utf-8'))
             
-            # Log incoming message
-            msg_type = "AlarmEvent" if is_event else "AlarmFrame" if is_frame else "Message"
-            logger.info(f"─── Incoming {msg_type} from {topic} ───")
+            logger.debug(f"Incoming message from {topic} -> {view_external_id}")
             
             # Write to CDF
             success = write_to_cdf(

@@ -65,7 +65,7 @@ class Config:
 
 def load_config(config_path: str = "/app/config.yaml") -> Config:
     """Load configuration from YAML file."""
-    logger.info(f"Loading configuration from {config_path}")
+    logger.debug(f"Loading configuration from {config_path}")
     
     with open(config_path, 'r') as f:
         data = yaml.safe_load(f)
@@ -92,7 +92,7 @@ def load_config(config_path: str = "/app/config.yaml") -> Config:
 
 def create_cognite_client(config: Config) -> CogniteClient:
     """Create and return a CogniteClient instance."""
-    logger.info(f"Connecting to Cognite: {config.cognite_cluster}/{config.cognite_project}")
+    logger.debug(f"Connecting to Cognite: {config.cognite_cluster}/{config.cognite_project}")
     
     credentials = OAuthClientCredentials(
         token_url=config.cognite_token_url,
@@ -113,7 +113,7 @@ def create_cognite_client(config: Config) -> CogniteClient:
     # Verify connection
     try:
         status = client.iam.token.inspect()
-        logger.info(f"Connected to CDF as: {status.subject}")
+        logger.debug(f"Connected to CDF as: {status.subject}")
     except Exception as e:
         logger.error(f"Failed to connect to CDF: {e}")
         raise
@@ -134,7 +134,7 @@ class MQTTAlarmExtractor:
             topic = sub['topic']
             view = sub['view']
             self.topic_view_map[topic] = view
-            logger.info(f"Subscription: {topic} -> {view}")
+            logger.debug(f"Subscription: {topic} -> {view}")
         
         # Create handler
         self.handler = AlarmHandler(
@@ -162,7 +162,7 @@ class MQTTAlarmExtractor:
             # Subscribe to all configured topics
             for topic in self.topic_view_map.keys():
                 client.subscribe(topic + "/#", qos=self.config.mqtt_qos)
-                logger.info(f"Subscribed to: {topic}/#")
+                logger.debug(f"Subscribed to: {topic}/#")
             
             logger.info("Ready for alarm events and frames")
         else:
@@ -188,18 +188,20 @@ class MQTTAlarmExtractor:
             logger.debug(f"No matching view for topic: {topic}")
             return
         
+        logger.debug(f"Received message on {topic}")
+        
         # Process the message
         self.handler.process_message(topic, msg.payload, view)
         
         # Periodic stats logging
         now = time.time()
         if now - self.last_stats_time >= self.stats_interval:
-            logger.info(f"Stats: {self.handler.get_stats_summary()}")
+            logger.debug(f"Stats: {self.handler.get_stats_summary()}")
             self.last_stats_time = now
     
     def start(self):
         """Start the extractor."""
-        logger.info("Starting MQTT Alarm Extractor...")
+        logger.debug("Starting MQTT Alarm Extractor...")
         
         # Create MQTT client
         self.mqtt_client = mqtt.Client(
@@ -221,7 +223,7 @@ class MQTTAlarmExtractor:
             )
         
         # Connect to MQTT broker
-        logger.info(f"Connecting to MQTT: {self.config.mqtt_host}:{self.config.mqtt_port}")
+        logger.debug(f"Connecting to MQTT: {self.config.mqtt_host}:{self.config.mqtt_port}")
         self.mqtt_client.connect(
             self.config.mqtt_host,
             self.config.mqtt_port,
@@ -242,7 +244,7 @@ class MQTTAlarmExtractor:
     
     def stop(self):
         """Stop the extractor."""
-        logger.info("Stopping MQTT Alarm Extractor...")
+        logger.debug("Stopping MQTT Alarm Extractor...")
         
         self.stop_event.set()
         
@@ -252,7 +254,7 @@ class MQTTAlarmExtractor:
         
         # Final stats
         logger.info(f"Final stats: {self.handler.get_stats_summary()}")
-        logger.info("MQTT Alarm Extractor stopped")
+        logger.debug("MQTT Alarm Extractor stopped")
 
 
 def main():
