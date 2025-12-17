@@ -1,6 +1,6 @@
 {
   "name": "MQTT Alarm Extractor for Cognite",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "slug": "mqtt-alarm-extractor",
   "description": "Extract alarm events and frames from MQTT and write to Cognite Data Fusion data model views",
   "url": "https://github.com/tmolbach/mqtt-extractor-ha-addon",
@@ -28,114 +28,27 @@
     "log_level": "INFO"
   },
   "schema": {
-    "type": "object",
-    "properties": {
-      "cognite_project": {
-        "title": "Cognite Project",
-        "type": "string",
-        "description": "CDF project name"
-      },
-      "cognite_cluster": {
-        "title": "Cognite Cluster",
-        "type": "string",
-        "description": "CDF cluster (e.g., az-eastus-1, westeurope-1)"
-      },
-      "cognite_client_id": {
-        "title": "Cognite Client ID",
-        "type": "string",
-        "description": "OAuth2 client ID for CDF authentication"
-      },
-      "cognite_client_secret": {
-        "title": "Cognite Client Secret",
-        "type": "string",
-        "description": "OAuth2 client secret for CDF authentication"
-      },
-      "cognite_token_url": {
-        "title": "Cognite Token URL",
-        "type": "string",
-        "description": "OAuth2 token endpoint URL"
-      },
-      "cognite_scopes": {
-        "title": "Cognite Scopes",
-        "type": "string",
-        "description": "OAuth2 scopes for CDF access"
-      },
-      "mqtt_host": {
-        "title": "MQTT Host",
-        "type": "string",
-        "description": "MQTT broker hostname"
-      },
-      "mqtt_port": {
-        "title": "MQTT Port",
-        "type": "integer",
-        "description": "MQTT broker port",
-        "default": 1883
-      },
-      "mqtt_username": {
-        "title": "MQTT Username",
-        "type": "string",
-        "description": "MQTT authentication username"
-      },
-      "mqtt_password": {
-        "title": "MQTT Password",
-        "type": "string",
-        "description": "MQTT authentication password"
-      },
-      "mqtt_qos": {
-        "title": "MQTT QoS",
-        "type": "integer",
-        "description": "MQTT Quality of Service level (0, 1, or 2)",
-        "default": 1
-      },
-      "data_model_space": {
-        "title": "Data Model Space",
-        "type": "string",
-        "description": "CDF space for data model instances"
-      },
-      "data_model_version": {
-        "title": "Data Model Version",
-        "type": "string",
-        "description": "Version of the data model views"
-      },
-      "alarm_event_topic": {
-        "title": "Alarm Event Topic",
-        "type": "string",
-        "description": "MQTT topic for alarm events",
-        "default": "events/alarms/log"
-      },
-      "alarm_event_view": {
-        "title": "Alarm Event View",
-        "type": "string",
-        "description": "Target CDF data model view for alarm events",
-        "default": "haAlarmEvent"
-      },
-      "alarm_frame_topic": {
-        "title": "Alarm Frame Topic",
-        "type": "string",
-        "description": "MQTT topic for alarm frames",
-        "default": "events/alarms/frame"
-      },
-      "alarm_frame_view": {
-        "title": "Alarm Frame View",
-        "type": "string",
-        "description": "Target CDF data model view for alarm frames",
-        "default": "haAlarmFrame"
-      },
-      "log_level": {
-        "title": "Log Level",
-        "type": "string",
-        "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
-        "description": "Logging verbosity level",
-        "default": "INFO"
-      }
-    },
-    "required": [
-      "cognite_project",
-      "cognite_client_id",
-      "cognite_client_secret",
-      "cognite_token_url",
-      "data_model_space"
-    ]
-  }
+    "cognite_project": "str",
+    "cognite_cluster": "str?",
+    "cognite_client_id": "str",
+    "cognite_client_secret": "str",
+    "cognite_token_url": "str",
+    "cognite_scopes": "str?",
+    "mqtt_host": "str?",
+    "mqtt_port": "int?",
+    "mqtt_username": "str?",
+    "mqtt_password": "str?",
+    "mqtt_qos": "int(0,2)?",
+    "data_model_space": "str",
+    "data_model_version": "str?",
+    "alarm_event_topic": "str?",
+    "alarm_event_view": "str?",
+    "alarm_frame_topic": "str?",
+    "alarm_frame_view": "str?",
+    "log_level": "match(^(DEBUG|INFO|WARNING|ERROR)$)?"
+  },
+  "ports": {},
+  "ports_description": {},
+  "host_network": false
 }
 

@@ -2,6 +2,14 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.3] - 2025-12-17
+
+### Fixed
+- Rewrite schema to use Home Assistant's simple format (not JSON Schema)
+- Schema now uses: `str`, `str?`, `int?`, `int(0,2)?`, `match(...)?` format
+- Removed invalid JSON Schema fields: `type`, `title`, `description`, `enum`, `required`
+- Add missing `ports`, `ports_description`, `host_network` fields
+
 ## [1.0.2] - 2025-12-17
 
 ### Fixed
