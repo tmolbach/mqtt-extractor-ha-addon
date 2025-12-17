@@ -172,7 +172,8 @@ def _execute_workflow_trigger(client, db_name: str):
             'timestamp': int(current_time * 1000)
         }
         
-        logger.info(f"▶ Triggering workflow '{external_id}' (v{version}) for database: {db_name}")
+        version_display = version if version else "latest"
+        logger.info(f"▶ Triggering workflow '{external_id}' ({version_display}) for database: {db_name}")
         
         if version:
             execution = client.workflows.executions.run(
