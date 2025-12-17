@@ -218,17 +218,19 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             return
 
         if not payload_str:
+            logger.debug("Empty payload for topic %s, skipping", topic)
             return
 
         # Parse JSON
         try:
             data = json.loads(payload_str)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             # Not JSON, ignore for raw handler
+            logger.debug("Payload is not valid JSON for topic %s: %s", topic, e)
             return
 
         if not isinstance(data, dict):
-            logger.debug("Payload is not a JSON object for topic %s, skipping", topic)
+            logger.debug("Payload is not a JSON object for topic %s (type: %s), skipping", topic, type(data).__name__)
             return
 
         # Derive DB and Table names from topic and subscription_topic
@@ -288,7 +290,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                     row_key = "/".join(parts[2:])
                 logger.debug(f"Parsed from topic fallback: db={db_name}, table={table_name}, key={row_key}")
             else:
-                logger.warning("Topic %s too short to derive DB and Table names", topic)
+                logger.warning("Topic %s too short to derive DB and Table names (only %d parts)", topic, len(parts))
                 return
 
         # Sanitize DB and Table names (allow alphanumeric, underscore, dash)
@@ -319,7 +321,8 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 
                 row = Row(key=row_key, columns=data)
                 client.raw.rows.insert(safe_db_name, safe_table_name, [row])
-                logger.debug(f"Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
+                logger.info(f"✓ Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
+                logger.debug(f"Row data: {json.dumps(data, default=str)[:200]}")
                 
                 # Trigger workflow if configured (throttled per database)
                 trigger_workflow_if_needed(client, safe_db_name)
