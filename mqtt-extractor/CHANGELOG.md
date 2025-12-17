@@ -1,5 +1,10 @@
 ### Changelog
 
+**0.9.6-test** - 2025-12-16
+- **TEST:** Minimal alarm event write test - only writes external_id 'test123' with name and description
+- All complex property population commented out to isolate CDF write issue
+- No sanitization, no references, no timestamps - bare minimum test
+
 **0.9.5** - 2025-12-16
 - **FIX:** Extract `valueAtTrigger` and `triggerEntity` from root level of payload
 - Supports both root-level and metadata.triggerEntity for backward compatibility
