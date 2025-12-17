@@ -359,7 +359,12 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug(f"No data_model_writes config found for topic: {topic}")
             return
         
-        logger.debug(f"Found config for topic {topic}: view={view_config.get('view_external_id')}")
+        view_external_id = view_config.get('view_external_id')
+        is_alarm_frame = 'AlarmFrame' in view_external_id or 'alarm' in topic.lower() and 'frame' in topic.lower()
+        
+        if is_alarm_frame:
+            logger.info(f"📋 Processing alarm frame from topic: {topic}")
+        logger.debug(f"Found config for topic {topic}: view={view_external_id}")
         
         # Decode payload
         try:
@@ -374,13 +379,20 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Parse JSON
         try:
             data = json.loads(payload_str)
-            logger.debug(f"Parsed JSON from {topic}: {json.dumps(data, indent=2)}")
+            if is_alarm_frame:
+                logger.info(f"📋 Alarm frame JSON parsed: {json.dumps(data, indent=2)}")
+            else:
+                logger.debug(f"Parsed JSON from {topic}: {json.dumps(data, indent=2)}")
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse JSON for topic %s: %s", topic, e)
+            if is_alarm_frame:
+                logger.error(f"❌ Failed to parse alarm frame JSON!")
             return
 
         if not isinstance(data, dict):
             logger.debug("Payload is not a JSON object for topic %s, skipping", topic)
+            if is_alarm_frame:
+                logger.error(f"❌ Alarm frame payload is not a JSON object!")
             return
 
         # Get configuration values
@@ -418,7 +430,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         original_ext_id = external_id
         external_id = sanitize_external_id(external_id, prefix=prefix)
         if external_id != original_ext_id:
-            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
+            if is_alarm_frame:
+                logger.info(f"📋 Alarm frame external_id sanitized: {original_ext_id} -> {external_id}")
+            else:
+                logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData
@@ -448,12 +463,23 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         )
 
         try:
+            if is_alarm_frame:
+                logger.info(f"📋 Sending alarm frame to CDF: {external_id}")
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.debug(f"Wrote {view_external_id}: {external_id}")
+            if is_alarm_frame:
+                logger.info(f"✓ Alarm frame successfully written to CDF: {external_id}")
+            else:
+                logger.debug(f"Wrote {view_external_id}: {external_id}")
         except Exception as e:
-            logger.error(f"Failed to write {view_external_id} to CDF: {e}")
-            logger.error(f"Failed external_id: {external_id}")
-            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            if is_alarm_frame:
+                logger.error(f"❌ Failed to write alarm frame to CDF: {e}")
+                logger.error(f"❌ Alarm frame external_id: {external_id}")
+                logger.error(f"❌ Alarm frame properties: {json.dumps(properties, indent=2, default=str)}")
+                logger.error(f"❌ Alarm frame node: space={instance_space}, view={view_external_id}")
+            else:
+                logger.error(f"Failed to write {view_external_id} to CDF: {e}")
+                logger.error(f"Failed external_id: {external_id}")
+                logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:

@@ -1,5 +1,15 @@
 ### Changelog
 
+**1.0.5** - 2025-12-16
+- **DEBUG:** Added detailed INFO-level logging for alarm frames processing
+- Shows when alarm frame is received and parsed
+- Shows configuration being used
+- Shows properties being built
+- Shows external_id sanitization
+- Shows when sending to CDF and success/failure
+- Uses emoji indicators (📋 processing, ✓ success, ❌ error) for easy identification
+- Helps diagnose issues with alarm frames not appearing in CDF
+
 **1.0.4** - 2025-12-16
 - **IMPROVED:** Status message now shows breakdown of messages by handler type
 - Shows: TS (timeseries/simple), Raw (CDF Raw), Events (alarm events), Frames (alarm frames)
