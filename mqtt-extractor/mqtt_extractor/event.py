@@ -230,94 +230,18 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             version=data_model_version
         )
 
-        # Prepare properties for the alarm event
-        # Use name and description from payload if available
-        event_name = data.get('name') or message or f"Alarm occurrence {external_id}"
-        event_description = data.get('description') or (f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event")
-        
-        # Use source from payload for sourceContext (free-form string)
-        source_context = data.get('source', 'MQTT')
+        # MINIMAL TEST - Just write test123 with name and description
+        logger.warning("USING MINIMAL TEST MODE - Only writing name and description")
         
         properties = {
-            'name': event_name,
-            'description': event_description,
-            'sourceContext': source_context,  # Free-form string from payload (e.g., "HomeAssistant")
-            'sourceId': external_id,
-            'startTime': start_time,
+            'name': "Test Alarm Event 123",
+            'description': "This is a minimal test alarm event",
         }
         
-        # Add valueAtTrigger if available
-        if value_raw is not None:
-            properties['valueAtTrigger'] = str(value_raw)
-        
-        # Add triggerEntity if available
-        if trigger_entity:
-            properties['triggerEntity'] = trigger_entity
-
-        # Add end time if this is an ALARM_END event
-        if event_type == 'ALARM_END' and end_time:
-            properties['endTime'] = end_time
-
-        # Add reference to alarm definition if provided
-        if alarm_definition_id:
-            sanitized_def_id = sanitize_external_id(alarm_definition_id, prefix="had_")
-            if sanitized_def_id != alarm_definition_id:
-                logger.debug(f"Sanitized definition ID: {alarm_definition_id} -> {sanitized_def_id}")
-            properties['definition'] = {
-                'space': instance_space,
-                'externalId': sanitized_def_id
-            }
-        
-        # Add asset references if provided in payload
-        asset_refs = []
-        
-        # Check for 'property' field (singular asset reference)
-        if 'property' in data:
-            property_id = data.get('property')
-            if property_id:
-                sanitized_property_id = sanitize_external_id(property_id, prefix="haa_")
-                asset_refs.append({'space': instance_space, 'externalId': sanitized_property_id})
-                if sanitized_property_id != property_id:
-                    logger.debug(f"Sanitized property ID: {property_id} -> {sanitized_property_id}")
-        
-        # Also check for 'assets' array (for backward compatibility or multiple assets)
-        assets = data.get('assets', [])
-        if assets and isinstance(assets, list):
-            for asset in assets:
-                if isinstance(asset, str):
-                    sanitized_asset_id = sanitize_external_id(asset, prefix="haa_")
-                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset_id})
-                elif isinstance(asset, dict) and 'externalId' in asset:
-                    sanitized_asset_id = sanitize_external_id(asset['externalId'], prefix="haa_")
-                    asset_refs.append({
-                        'space': asset.get('space', instance_space),
-                        'externalId': sanitized_asset_id
-                    })
-        
-        if asset_refs:
-            properties['assets'] = asset_refs
-            logger.debug(f"Total asset references added to alarm event: {len(asset_refs)}")
-
-        # Add source system reference
-        # Source externalId should always be "MQTT" (the actual source value goes in sourceContext)
-        properties['source'] = {
-            'space': instance_space,  # Source systems are in the same instance space
-            'externalId': 'MQTT'
-        }
-
-        # Add tags from metadata if available
-        tags = []
-        if 'source' in metadata:
-            tags.append(f"source:{metadata['source']}")
-        if trigger_entity:
-            tags.append(f"entity:{trigger_entity}")
-        if tags:
-            properties['tags'] = tags
-
         # Create or update the alarm event node
         node = NodeApply(
             space=instance_space,
-            external_id=external_id,
+            external_id="test123",
             sources=[
                 NodeOrEdgeData(
                     source=view_id,
