@@ -287,7 +287,7 @@ def main():
     
     # Handle signals for graceful shutdown
     def signal_handler(signum, frame):
-        logger.info(f"Received signal {signum}")
+        logger.debug(f"Received signal {signum}")
         extractor.stop_event.set()
     
     signal.signal(signal.SIGTERM, signal_handler)
