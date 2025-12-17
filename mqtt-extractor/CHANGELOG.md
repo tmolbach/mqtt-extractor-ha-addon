@@ -1,5 +1,10 @@
 ### Changelog
 
+**0.9.5** - 2025-12-16
+- **FIX:** Extract `valueAtTrigger` and `triggerEntity` from root level of payload
+- Supports both root-level and metadata.triggerEntity for backward compatibility
+- Fixed field name mismatch that was causing `<unknown-property-identifier>` errors
+
 **0.9.4** - 2025-12-16
 - **FIX:** Source system reference now always uses `externalId: "MQTT"`
 - **FIX:** Extract `valueAtTrigger` and `triggerEntity` from root level of payload (not from metadata)
