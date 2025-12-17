@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from cognite.client import CogniteClient
-from cognite.client.data_classes.data_modeling import NodeApply, NodeId, ViewId
+from cognite.client.data_classes.data_modeling import NodeApply, NodeId, ViewId, NodeOrEdgeData
 
 logger = logging.getLogger(__name__)
 
@@ -117,11 +117,31 @@ def write_to_cdf(
         node = NodeApply(
             space=instance_space,
             external_id=external_id,
-            sources=[{
-                'source': view_id,
-                'properties': properties
-            }]
+            sources=[
+                NodeOrEdgeData(
+                    source=view_id,
+                    properties=properties
+                )
+            ]
         )
+        
+        # Log the full node structure before sending
+        try:
+            node_dict = {
+                'space': instance_space,
+                'external_id': external_id,
+                'sources': [{
+                    'source': {
+                        'space': data_model_space,
+                        'external_id': view_external_id,
+                        'version': data_model_version
+                    },
+                    'properties': properties
+                }]
+            }
+            logger.debug(f"  Full node payload: {json.dumps(node_dict, indent=2, default=str)}")
+        except Exception as log_err:
+            logger.debug(f"  Could not serialize node for logging: {log_err}")
         
         # Write to CDF
         result = client.data_modeling.instances.apply(nodes=[node])
@@ -130,6 +150,23 @@ def write_to_cdf(
         
     except Exception as e:
         logger.error(f"  ✗ Failed to write to CDF: {e}")
+        # Log the full node structure on error
+        try:
+            node_dict = {
+                'space': instance_space,
+                'external_id': external_id,
+                'sources': [{
+                    'source': {
+                        'space': data_model_space,
+                        'external_id': view_external_id,
+                        'version': data_model_version
+                    },
+                    'properties': properties
+                }]
+            }
+            logger.error(f"  Full node payload that failed: {json.dumps(node_dict, indent=2, default=str)}")
+        except Exception as log_err:
+            logger.error(f"  Could not serialize failed node for logging: {log_err}")
         logger.debug("Full traceback:", exc_info=True)
         return False
 

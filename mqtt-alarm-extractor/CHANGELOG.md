@@ -2,6 +2,13 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.6] - 2025-12-17
+
+### Fixed
+- Use NodeOrEdgeData wrapper for sources in NodeApply (not plain dict)
+- Add detailed error logging showing full node payload on failure
+- Fixes 'dict' object has no attribute 'dump' error
+
 ## [1.0.5] - 2025-12-17
 
 ### Fixed
