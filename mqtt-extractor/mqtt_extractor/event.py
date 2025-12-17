@@ -230,24 +230,40 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             version=data_model_version
         )
 
-        # MINIMAL TEST - Just write test123 with name and description
-        logger.warning("USING MINIMAL TEST MODE - Only writing name and description")
+        # MINIMAL TEST - Include mandatory eventType field
+        logger.warning("USING MINIMAL TEST MODE - Only writing name, description, eventType, and assets")
         logger.warning(f"ViewId: space={data_model_space}, external_id={view_external_id}, version={data_model_version}")
         logger.warning(f"Instance space: {instance_space}")
         
-        # Use exact same pattern as the example
+        # Map ALARM_START/ALARM_END to CDF eventType values
+        cdf_event_type = "ACTIVATED" if event_type == "ALARM_START" else "CLEARED"
+        logger.warning(f"Mapping {event_type} -> eventType: {cdf_event_type}")
+        
+        # Use exact same pattern as the validated example
         node = NodeApply(
             space=instance_space,
             external_id="test123",
-            sources=[NodeOrEdgeData(source=view_id, properties={"name": "Test Alarm Event 123"})],
+            sources=[
+                NodeOrEdgeData(
+                    source=view_id,
+                    properties={
+                        "name": "Test Alarm Event 123",
+                        "description": "This is a minimal test alarm event",
+                        "eventType": cdf_event_type,  # Mandatory: ACTIVATED or CLEARED
+                        "assets": [
+                            {"space": instance_space, "externalId": "haa_75_nsunkenmeadow"}
+                        ]
+                    }
+                )
+            ],
         )
         
         logger.warning(f"Node to send: space={node.space}, external_id={node.external_id}")
-        logger.warning(f"Node sources: {node.sources}")
+        logger.warning(f"Properties: {node.sources[0].properties if node.sources else 'None'}")
         
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.info(f"SUCCESS: Alarm event test123 written to CDF")
+            logger.info(f"✓ SUCCESS: Alarm event test123 written to CDF with eventType={cdf_event_type}")
         except Exception as e:
             logger.error(f"Failed to write alarm event to CDF: {e}")
             logger.error(f"Failed for external_id: test123")
