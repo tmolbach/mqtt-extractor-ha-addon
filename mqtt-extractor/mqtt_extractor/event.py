@@ -40,11 +40,11 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
             original_had_prefix = True
             break
     
-    # Replace dots and other invalid characters with underscores
-    # CDF allows: letters, numbers, underscores only
+    # CDF allows: letters, numbers, underscores, dots, hyphens
+    # Only replace truly invalid characters (spaces, special chars)
     sanitized = ''
     for char in ext_id:
-        if char.isalnum() or char == '_':
+        if char.isalnum() or char in ('_', '.', '-'):
             sanitized += char
         else:
             sanitized += '_'
@@ -260,12 +260,29 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             properties['endTime'] = end_time
 
         # Add reference to alarm definition if provided
+        # Note: The definition node must already exist in CDF or this will fail
         if alarm_definition_id:
             sanitized_def_id = sanitize_external_id(alarm_definition_id, prefix="had_")
-            properties['definition'] = {
-                'space': instance_space,
-                'externalId': sanitized_def_id
-            }
+            
+            # Try to verify if the definition exists (optional, but helpful)
+            try:
+                # Check if the alarm definition exists
+                existing_def = client.data_modeling.instances.retrieve(
+                    nodes=[(instance_space, sanitized_def_id)],
+                    sources=[]  # Just check existence
+                )
+                
+                if existing_def.nodes:
+                    properties['definition'] = {
+                        'space': instance_space,
+                        'externalId': sanitized_def_id
+                    }
+                    logger.debug(f"Linked to alarm definition: {sanitized_def_id}")
+                else:
+                    logger.warning(f"Alarm definition '{sanitized_def_id}' does not exist in CDF, creating alarm event without definition link")
+            except Exception as e:
+                logger.warning(f"Could not verify alarm definition '{sanitized_def_id}': {e}. Creating alarm event without definition link")
+                logger.debug("Full traceback:", exc_info=True)
         
         # Add asset references if provided in payload
         asset_refs = []

@@ -1,5 +1,12 @@
 ### Changelog
 
+**1.0.2** - 2025-12-16
+- **FIX:** Preserve dots (.) in external IDs - they are allowed by CDF
+- **FIX:** Alarm events now check if alarm definition exists before linking
+- If alarm definition doesn't exist, creates alarm event without definition link (with warning)
+- Prevents "Cannot auto-create a direct relation target" errors
+- Dots, hyphens, and underscores now preserved in external IDs
+
 **1.0.1** - 2025-12-16
 - **IMPROVED:** Added INFO-level logging for workflow triggers
   - Shows when workflow is triggered with execution ID

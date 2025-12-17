@@ -65,11 +65,11 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
             original_had_prefix = True
             break
     
-    # Replace dots and other invalid characters with underscores
-    # CDF allows: letters, numbers, underscores only
+    # CDF allows: letters, numbers, underscores, dots, hyphens
+    # Only replace truly invalid characters (spaces, special chars)
     sanitized = ''
     for char in ext_id:
-        if char.isalnum() or char == '_':
+        if char.isalnum() or char in ('_', '.', '-'):
             sanitized += char
         else:
             sanitized += '_'
