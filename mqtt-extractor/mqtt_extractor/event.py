@@ -9,10 +9,14 @@ logger = logging.getLogger(__name__)
 def sanitize_external_id(ext_id: str) -> str:
     """
     Ensure external ID meets CDF naming requirements.
-    Must start with a letter and contain only letters, numbers, and underscores.
+    Must start with a letter, contain only letters/numbers/underscores, and end with letter/number.
+    Pattern: ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$
     """
     if not ext_id:
         return ext_id
+    
+    # Convert to string if not already
+    ext_id = str(ext_id)
     
     # If it starts with a number, prefix with "alarm_"
     if ext_id[0].isdigit():
@@ -26,6 +30,17 @@ def sanitize_external_id(ext_id: str) -> str:
             sanitized += char
         else:
             sanitized += '_'
+    
+    # Strip trailing underscores (CDF requires ending with letter or number)
+    sanitized = sanitized.rstrip('_')
+    
+    # If somehow we ended up with an empty string or all underscores, provide fallback
+    if not sanitized:
+        sanitized = 'alarm_unknown'
+    
+    # Ensure it still starts with a letter after all transformations
+    if sanitized[0].isdigit():
+        sanitized = f"alarm_{sanitized}"
     
     return sanitized
 
@@ -169,6 +184,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
+        logger.debug(f"Full alarm event data: {json.dumps(data, indent=2, default=str)}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData, NodeId
@@ -185,9 +201,13 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         )
 
         # Prepare properties for the alarm event
+        # Use name and description from payload if available
+        event_name = data.get('name') or message or f"Alarm occurrence {external_id}"
+        event_description = data.get('description') or (f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event")
+        
         properties = {
-            'name': message or f"Alarm occurrence {external_id}",
-            'description': f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event",
+            'name': event_name,
+            'description': event_description,
             'sourceContext': 'MQTT',
             'sourceId': external_id,
             'startTime': start_time,
@@ -244,12 +264,16 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             properties['assets'] = asset_refs
             logger.debug(f"Total asset references added to alarm event: {len(asset_refs)}")
 
-        # Add source system reference if configured
-        source_system = alarm_config.get('source_system', 'MQTT')
+        # Add source system reference
+        # Use source from payload if provided, otherwise use config
+        source_id = data.get('source') or alarm_config.get('source_system', 'MQTT')
+        sanitized_source_id = sanitize_external_id(str(source_id))
         properties['source'] = {
             'space': instance_space,
-            'externalId': source_system
+            'externalId': sanitized_source_id
         }
+        if source_id != sanitized_source_id:
+            logger.debug(f"Sanitized source ID: {source_id} -> {sanitized_source_id}")
 
         # Add tags from metadata if available
         tags = []
@@ -272,13 +296,16 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             ]
         )
 
+        # Log what we're about to send
+        logger.debug(f"Alarm event properties to send: {json.dumps(properties, indent=2, default=str)}")
+        
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
             logger.info(f"Alarm event {event_type}: {external_id} written to CDF")
-            logger.debug(f"Alarm event properties written: {json.dumps(properties, indent=2, default=str)}")
         except Exception as e:
             logger.error(f"Failed to write alarm event to CDF: {e}")
-            logger.debug(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            logger.error(f"Failed for external_id: {external_id}")
+            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:

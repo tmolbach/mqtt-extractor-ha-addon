@@ -1,6 +1,6 @@
 {
   "name": "MQTT to Cognite Data Fusion Extractor",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "slug": "mqtt-extractor",
   "description": "Extracts MQTT messages and pushes them to Cognite Data Fusion (CDF)",
   "arch": ["amd64", "aarch64", "armv7"],

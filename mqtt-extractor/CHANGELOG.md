@@ -1,5 +1,17 @@
 ### Changelog
 
+**0.8.6** - 2025-12-16
+- **CRITICAL FIX:** Enhanced external ID sanitization to meet full CDF regex requirements
+- External IDs cannot end with underscores (must end with letter or number)
+- Added `.rstrip('_')` to remove trailing underscores from sanitized IDs
+- Fixed `<unknown-property-identifier>` errors when IDs ended with dots or other chars converted to `_`
+- **NEW:** Use `name` and `description` from payload when provided
+- Alarm event name/description now properly carried over from MQTT payload to CDF
+- Falls back to generated values only if not provided in payload
+- Improved error logging to show full properties dict when CDF writes fail
+- Added comprehensive DEBUG logging for troubleshooting
+- Fixes: "identifier must match regex pattern" errors for IDs ending with special chars
+
 **0.8.5** - 2025-12-16
 - **NEW:** Add support for `property` field in alarm payloads as asset reference
 - Property field (singular) is now automatically added to the `assets` relationship array

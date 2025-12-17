@@ -34,10 +34,14 @@ data_model_writes_config: Dict[str, Dict] = {}
 def sanitize_external_id(ext_id: str) -> str:
     """
     Ensure external ID meets CDF naming requirements.
-    Must start with a letter and contain only letters, numbers, and underscores.
+    Must start with a letter, contain only letters/numbers/underscores, and end with letter/number.
+    Pattern: ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$
     """
     if not ext_id:
         return ext_id
+    
+    # Convert to string if not already
+    ext_id = str(ext_id)
     
     # If it starts with a number, prefix with "alarm_"
     if ext_id[0].isdigit():
@@ -51,6 +55,17 @@ def sanitize_external_id(ext_id: str) -> str:
             sanitized += char
         else:
             sanitized += '_'
+    
+    # Strip trailing underscores (CDF requires ending with letter or number)
+    sanitized = sanitized.rstrip('_')
+    
+    # If somehow we ended up with an empty string or all underscores, provide fallback
+    if not sanitized:
+        sanitized = 'alarm_unknown'
+    
+    # Ensure it still starts with a letter after all transformations
+    if sanitized[0].isdigit():
+        sanitized = f"alarm_{sanitized}"
     
     return sanitized
 
