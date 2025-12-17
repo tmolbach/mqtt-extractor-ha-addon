@@ -6,11 +6,18 @@ from typing import Generator, Tuple, Union, Any
 logger = logging.getLogger(__name__)
 
 
-def sanitize_external_id(ext_id: str) -> str:
+def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     """
     Ensure external ID meets CDF naming requirements.
     Must start with a letter, contain only letters/numbers/underscores, and end with letter/number.
     Pattern: ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$
+    
+    Args:
+        ext_id: The external ID to sanitize
+        prefix: Prefix to use if ID starts with number (default: "hal_")
+                - "hal_" for alarm events (Home Assistant aLarm)
+                - "had_" for alarm definitions (Home Assistant alarm Definition)
+                - "haa_" for assets/properties (Home Assistant Asset)
     """
     if not ext_id:
         return ext_id
@@ -27,20 +34,20 @@ def sanitize_external_id(ext_id: str) -> str:
         else:
             sanitized += '_'
     
-    # If it starts with a number, prefix with "hal_" (Home Assistant aLarm)
+    # If it starts with a number, add the specified prefix
     if sanitized[0].isdigit():
-        sanitized = f"hal_{sanitized}"
+        sanitized = f"{prefix}{sanitized}"
     
     # Strip trailing underscores (CDF requires ending with letter or number)
     sanitized = sanitized.rstrip('_')
     
     # If somehow we ended up with an empty string or all underscores, provide fallback
     if not sanitized:
-        sanitized = 'hal_unknown'
+        sanitized = f"{prefix}unknown"
     
     # Final check: ensure it starts with a letter
     if sanitized and not sanitized[0].isalpha():
-        sanitized = f"hal_{sanitized}"
+        sanitized = f"{prefix}{sanitized}"
     
     return sanitized
 
@@ -176,11 +183,11 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 # For ALARM_END, try to find the most recent open alarm
                 external_id = f"{external_id_prefix}{start_time_ms}"
         
-        # Sanitize external_id to meet CDF naming requirements
+        # Sanitize external_id to meet CDF naming requirements (alarm event)
         original_ext_id = external_id
-        external_id = sanitize_external_id(external_id)
+        external_id = sanitize_external_id(external_id, prefix="hal_")
         if external_id != original_ext_id:
-            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
+            logger.debug(f"Sanitized alarm event external_id: {original_ext_id} -> {external_id}")
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
@@ -227,7 +234,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         # Add reference to alarm definition if provided
         if alarm_definition_id:
-            sanitized_def_id = sanitize_external_id(alarm_definition_id)
+            sanitized_def_id = sanitize_external_id(alarm_definition_id, prefix="had_")
             if sanitized_def_id != alarm_definition_id:
                 logger.debug(f"Sanitized definition ID: {alarm_definition_id} -> {sanitized_def_id}")
             properties['definition'] = {
@@ -242,7 +249,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         if 'property' in data:
             property_id = data.get('property')
             if property_id:
-                sanitized_property_id = sanitize_external_id(property_id)
+                sanitized_property_id = sanitize_external_id(property_id, prefix="haa_")
                 asset_refs.append({'space': instance_space, 'externalId': sanitized_property_id})
                 if sanitized_property_id != property_id:
                     logger.debug(f"Sanitized property ID: {property_id} -> {sanitized_property_id}")
@@ -252,10 +259,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         if assets and isinstance(assets, list):
             for asset in assets:
                 if isinstance(asset, str):
-                    sanitized_asset_id = sanitize_external_id(asset)
+                    sanitized_asset_id = sanitize_external_id(asset, prefix="haa_")
                     asset_refs.append({'space': instance_space, 'externalId': sanitized_asset_id})
                 elif isinstance(asset, dict) and 'externalId' in asset:
-                    sanitized_asset_id = sanitize_external_id(asset['externalId'])
+                    sanitized_asset_id = sanitize_external_id(asset['externalId'], prefix="haa_")
                     asset_refs.append({
                         'space': asset.get('space', instance_space),
                         'externalId': sanitized_asset_id
@@ -268,7 +275,8 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Add source system reference
         # Use source from payload if provided, otherwise use config
         source_id = data.get('source') or alarm_config.get('source_system', 'MQTT')
-        sanitized_source_id = sanitize_external_id(str(source_id))
+        # Source typically starts with a letter (like "HomeAssistant"), so use minimal prefix
+        sanitized_source_id = sanitize_external_id(str(source_id), prefix="has_")
         properties['source'] = {
             'space': instance_space,
             'externalId': sanitized_source_id

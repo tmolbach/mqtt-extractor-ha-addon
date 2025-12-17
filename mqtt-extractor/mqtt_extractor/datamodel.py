@@ -31,11 +31,18 @@ logger = logging.getLogger(__name__)
 data_model_writes_config: Dict[str, Dict] = {}
 
 
-def sanitize_external_id(ext_id: str) -> str:
+def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     """
     Ensure external ID meets CDF naming requirements.
     Must start with a letter, contain only letters/numbers/underscores, and end with letter/number.
     Pattern: ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$
+    
+    Args:
+        ext_id: The external ID to sanitize
+        prefix: Prefix to use if ID starts with number (default: "hal_")
+                - "hal_" for alarm events (Home Assistant aLarm)
+                - "had_" for alarm definitions (Home Assistant alarm Definition)
+                - "haa_" for assets/properties (Home Assistant Asset)
     """
     if not ext_id:
         return ext_id
@@ -52,20 +59,20 @@ def sanitize_external_id(ext_id: str) -> str:
         else:
             sanitized += '_'
     
-    # If it starts with a number, prefix with "hal_" (Home Assistant aLarm)
+    # If it starts with a number, add the specified prefix
     if sanitized[0].isdigit():
-        sanitized = f"hal_{sanitized}"
+        sanitized = f"{prefix}{sanitized}"
     
     # Strip trailing underscores (CDF requires ending with letter or number)
     sanitized = sanitized.rstrip('_')
     
     # If somehow we ended up with an empty string or all underscores, provide fallback
     if not sanitized:
-        sanitized = 'hal_unknown'
+        sanitized = f"{prefix}unknown"
     
     # Final check: ensure it starts with a letter
     if sanitized and not sanitized[0].isalpha():
-        sanitized = f"hal_{sanitized}"
+        sanitized = f"{prefix}{sanitized}"
     
     return sanitized
 
@@ -183,24 +190,24 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         definition = data.get('definition') or data.get('alarm_definition_id')
         if definition:
             if isinstance(definition, str):
-                sanitized_def = sanitize_external_id(definition)
+                sanitized_def = sanitize_external_id(definition, prefix="had_")
                 properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
             elif isinstance(definition, dict):
                 # Sanitize externalId if present in dict
                 if 'externalId' in definition:
-                    definition['externalId'] = sanitize_external_id(definition['externalId'])
+                    definition['externalId'] = sanitize_external_id(definition['externalId'], prefix="had_")
                 properties['definition'] = definition
         
         # Source system (CogniteSourceable)
         source = data.get('source')
         if source:
             if isinstance(source, str):
-                sanitized_source = sanitize_external_id(source)
+                sanitized_source = sanitize_external_id(source, prefix="has_")
                 properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
             elif isinstance(source, dict):
                 # Sanitize externalId if present in dict
                 if 'externalId' in source:
-                    source['externalId'] = sanitize_external_id(source['externalId'])
+                    source['externalId'] = sanitize_external_id(source['externalId'], prefix="has_")
                 properties['source'] = source
         
         # Asset references
@@ -210,7 +217,7 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         if 'property' in data:
             property_id = data.get('property')
             if property_id:
-                sanitized_property = sanitize_external_id(property_id)
+                sanitized_property = sanitize_external_id(property_id, prefix="haa_")
                 asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
         
         # Also check for 'assets' array (for backward compatibility or multiple assets)
@@ -218,11 +225,11 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         if assets and isinstance(assets, list):
             for asset in assets:
                 if isinstance(asset, str):
-                    sanitized_asset = sanitize_external_id(asset)
+                    sanitized_asset = sanitize_external_id(asset, prefix="haa_")
                     asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
                 elif isinstance(asset, dict):
                     if 'externalId' in asset:
-                        asset['externalId'] = sanitize_external_id(asset['externalId'])
+                        asset['externalId'] = sanitize_external_id(asset['externalId'], prefix="haa_")
                     asset_refs.append(asset)
         
         if asset_refs:
@@ -255,12 +262,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         definition = data.get('definition') or data.get('alarm_definition_id')
         if definition:
             if isinstance(definition, str):
-                sanitized_def = sanitize_external_id(definition)
+                sanitized_def = sanitize_external_id(definition, prefix="had_")
                 properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
             elif isinstance(definition, dict):
                 # Sanitize externalId if present in dict
                 if 'externalId' in definition:
-                    definition['externalId'] = sanitize_external_id(definition['externalId'])
+                    definition['externalId'] = sanitize_external_id(definition['externalId'], prefix="had_")
                 properties['definition'] = definition
         
         # Asset references
@@ -270,7 +277,7 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         if 'property' in data:
             property_id = data.get('property')
             if property_id:
-                sanitized_property = sanitize_external_id(property_id)
+                sanitized_property = sanitize_external_id(property_id, prefix="haa_")
                 asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
         
         # Also check for 'assets' array (for backward compatibility or multiple assets)
@@ -278,12 +285,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         if assets and isinstance(assets, list):
             for asset in assets:
                 if isinstance(asset, str):
-                    sanitized_asset = sanitize_external_id(asset)
+                    sanitized_asset = sanitize_external_id(asset, prefix="haa_")
                     asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
                 elif isinstance(asset, dict):
                     # Sanitize externalId if present in dict
                     if 'externalId' in asset:
-                        asset['externalId'] = sanitize_external_id(asset['externalId'])
+                        asset['externalId'] = sanitize_external_id(asset['externalId'], prefix="haa_")
                     asset_refs.append(asset)
         
         if asset_refs:
@@ -293,12 +300,12 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
         source = data.get('source')
         if source:
             if isinstance(source, str):
-                sanitized_source = sanitize_external_id(source)
+                sanitized_source = sanitize_external_id(source, prefix="has_")
                 properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
             elif isinstance(source, dict):
                 # Sanitize externalId if present in dict
                 if 'externalId' in source:
-                    source['externalId'] = sanitize_external_id(source['externalId'])
+                    source['externalId'] = sanitize_external_id(source['externalId'], prefix="has_")
                 properties['source'] = source
     
     else:
@@ -394,8 +401,16 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug(f"Generated external_id: {external_id}")
         
         # Sanitize external_id to meet CDF naming requirements
+        # Use appropriate prefix based on view type
+        if 'AlarmEvent' in view_external_id:
+            prefix = "hal_"  # Home Assistant aLarm event
+        elif 'AlarmFrame' in view_external_id:
+            prefix = "haf_"  # Home Assistant alarm Frame
+        else:
+            prefix = "ha_"   # Generic Home Assistant
+        
         original_ext_id = external_id
-        external_id = sanitize_external_id(external_id)
+        external_id = sanitize_external_id(external_id, prefix=prefix)
         if external_id != original_ext_id:
             logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 

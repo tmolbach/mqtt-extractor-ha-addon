@@ -1,5 +1,17 @@
 ### Changelog
 
+**0.9.2** - 2025-12-16
+- **NEW:** Type-specific prefixes for different entity types
+- Alarm events: `hal_` prefix (Home Assistant aLarm)
+- Alarm definitions: `had_` prefix (Home Assistant alarm Definition)
+- Assets/Properties: `haa_` prefix (Home Assistant Asset)
+- Source systems: `has_` prefix (Home Assistant Source)
+- Alarm frames: `haf_` prefix (Home Assistant alarm Frame)
+- Makes entity types easily distinguishable in CDF by their prefix
+- Example: `75_nsunkenmeadow` → `haa_75_nsunkenmeadow` (asset)
+- Example: `75_nsunkenmeadow_alarmdef_...` → `had_75_nsunkenmeadow_alarmdef_...` (definition)
+- Example: `75_nsunkenmeadow_alarmdef_..._log_123` → `hal_75_nsunkenmeadow_alarmdef_..._log_123` (event)
+
 **0.9.1** - 2025-12-16
 - **CRITICAL FIX:** Re-implement proper external ID sanitization with correct CDF rules
 - External IDs MUST match pattern: `^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$`
