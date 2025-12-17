@@ -2,6 +2,15 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.4] - 2025-12-17
+
+### Fixed
+- Fix Dockerfile to match Home Assistant add-on pattern
+- Change CMD to ENTRYPOINT (required for HA add-ons)
+- Add BUILD_FROM default value
+- Add `init: false` to config.json
+- Add bash to installed packages
+
 ## [1.0.3] - 2025-12-17
 
 ### Fixed
