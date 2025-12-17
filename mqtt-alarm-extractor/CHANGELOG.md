@@ -2,6 +2,11 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.2] - 2025-12-17
+
+### Fixed
+- Update slug to match directory name for Home Assistant discovery
+
 ## [1.0.1] - 2025-12-17
 
 ### Fixed
