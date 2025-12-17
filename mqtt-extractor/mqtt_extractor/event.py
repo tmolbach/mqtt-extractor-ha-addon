@@ -232,34 +232,26 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         # MINIMAL TEST - Just write test123 with name and description
         logger.warning("USING MINIMAL TEST MODE - Only writing name and description")
+        logger.warning(f"ViewId: space={data_model_space}, external_id={view_external_id}, version={data_model_version}")
+        logger.warning(f"Instance space: {instance_space}")
         
-        properties = {
-            'name': "Test Alarm Event 123",
-            'description': "This is a minimal test alarm event",
-        }
-        
-        # Create or update the alarm event node
+        # Use exact same pattern as the example
         node = NodeApply(
             space=instance_space,
             external_id="test123",
-            sources=[
-                NodeOrEdgeData(
-                    source=view_id,
-                    properties=properties
-                )
-            ]
+            sources=[NodeOrEdgeData(source=view_id, properties={"name": "Test Alarm Event 123"})],
         )
-
-        # Log what we're about to send
-        logger.debug(f"Alarm event properties to send: {json.dumps(properties, indent=2, default=str)}")
+        
+        logger.warning(f"Node to send: space={node.space}, external_id={node.external_id}")
+        logger.warning(f"Node sources: {node.sources}")
         
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.info(f"Alarm event {event_type}: {external_id} written to CDF")
+            logger.info(f"SUCCESS: Alarm event test123 written to CDF")
         except Exception as e:
             logger.error(f"Failed to write alarm event to CDF: {e}")
-            logger.error(f"Failed for external_id: {external_id}")
-            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            logger.error(f"Failed for external_id: test123")
+            logger.error(f"ViewId used: {view_id}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:
