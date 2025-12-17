@@ -1,5 +1,12 @@
 ### Changelog
 
+**1.0.6** - 2025-12-16
+- **FIX:** Actually add MQTT subscription for alarm frames topic!
+- The subscription for `events/alarms/frame` was missing
+- Configuration was added but no subscription = no messages received
+- Now properly subscribes to `events/alarms/frame` when alarm events are enabled
+- Alarm frames should now flow from MQTT → Extractor → CDF
+
 **1.0.5** - 2025-12-16
 - **DEBUG:** Added detailed INFO-level logging for alarm frames processing
 - Shows when alarm frame is received and parsed

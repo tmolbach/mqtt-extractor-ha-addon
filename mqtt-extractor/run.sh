@@ -326,6 +326,19 @@ fi
 
 # Process data model writes topics - add subscriptions for flexible topic-to-view mapping
 # These use the mqtt_extractor.datamodel handler
+
+# First, add alarm frame subscription if alarm events are enabled
+if [ "${ENABLE_ALARM_EVENTS}" = "true" ] && [ -n "${ALARM_EVENT_INSTANCE_SPACE}" ]; then
+    cat >> "$CONFIG_FILE" <<EOF
+  - topic: "events/alarms/frame"
+    qos: ${MQTT_QOS}
+    handler:
+      module: mqtt_extractor.datamodel
+EOF
+    echo "[Startup 76%] Added subscription for alarm frames: events/alarms/frame"
+fi
+
+# Then, add any user-configured data model writes subscriptions
 if [ "${DATA_MODEL_WRITES}" != "[]" ] && [ -n "${DATA_MODEL_WRITES}" ]; then
     # Extract topics from data_model_writes array and add subscriptions
     echo "${DATA_MODEL_WRITES}" | python3 -c "
