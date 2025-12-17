@@ -90,10 +90,10 @@ def write_to_cdf(
         True if successful, False otherwise
     """
     try:
-        # Get external_id from payload (required field)
-        external_id = payload.get('external_id')
+        # Get external_id from payload (support both camelCase and snake_case)
+        external_id = payload.get('externalId') or payload.get('external_id')
         if not external_id:
-            logger.error("Missing 'external_id' in payload")
+            logger.error("Missing 'externalId' or 'external_id' in payload")
             return False
         
         # Transform payload to CDF properties
@@ -101,9 +101,11 @@ def write_to_cdf(
         
         # Remove external_id from properties (it's used as the node ID, not a property)
         properties.pop('external_id', None)
+        properties.pop('externalId', None)
         
-        logger.debug(f"Writing to {view_external_id}: {external_id}")
-        logger.debug(f"Properties: {json.dumps(properties, indent=2, default=str)}")
+        logger.info(f"Processing {view_external_id}: {external_id}")
+        logger.info(f"  Name: {properties.get('name', 'N/A')}")
+        logger.info(f"  Properties: {json.dumps(properties, default=str)}")
         
         # Create node
         view_id = ViewId(
@@ -123,11 +125,11 @@ def write_to_cdf(
         
         # Write to CDF
         result = client.data_modeling.instances.apply(nodes=[node])
-        logger.info(f"Wrote {view_external_id} node: {external_id}")
+        logger.info(f"  ✓ Written to CDF successfully")
         return True
         
     except Exception as e:
-        logger.error(f"Failed to write to CDF: {e}")
+        logger.error(f"  ✗ Failed to write to CDF: {e}")
         logger.debug("Full traceback:", exc_info=True)
         return False
 
@@ -180,16 +182,21 @@ class AlarmHandler:
             True if successful, False otherwise
         """
         # Track statistics
-        if 'Event' in view_external_id:
+        is_event = 'Event' in view_external_id
+        is_frame = 'Frame' in view_external_id
+        
+        if is_event:
             self.stats['events_received'] += 1
-        elif 'Frame' in view_external_id:
+        elif is_frame:
             self.stats['frames_received'] += 1
         
         try:
             # Parse JSON payload
             payload = json.loads(payload_bytes.decode('utf-8'))
             
-            logger.debug(f"Processing message from {topic} -> {view_external_id}")
+            # Log incoming message
+            msg_type = "AlarmEvent" if is_event else "AlarmFrame" if is_frame else "Message"
+            logger.info(f"─── Incoming {msg_type} from {topic} ───")
             
             # Write to CDF
             success = write_to_cdf(
