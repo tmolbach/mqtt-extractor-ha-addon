@@ -422,17 +422,34 @@ alarm-events:
   source-system: "${ALARM_EVENT_SOURCE_SYSTEM}"
 EOF
     echo "[Startup 77%] Alarm event configuration added"
+    
+    # Automatically configure alarm frames to use data model handler
+    # Frames are written to a separate view (haAlarmFrame) for episode tracking
+    echo "[Startup 78%] Auto-configuring alarm frames (haAlarmFrame view)"
 fi
 
 # Add data model writes configuration if provided (flexible topic-to-view mapping)
 # This allows routing different MQTT topics to different CDF data model views
+# Also automatically add alarm frames if alarm events are enabled
 if [ "${DATA_MODEL_WRITES}" != "[]" ] && [ -n "${DATA_MODEL_WRITES}" ]; then
     # Check if there are any entries in the array
     WRITE_COUNT=$(echo "${DATA_MODEL_WRITES}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d, list) else 0)" 2>/dev/null || echo "0")
     
-    if [ "${WRITE_COUNT}" -gt "0" ]; then
+    if [ "${WRITE_COUNT}" -gt "0" ] || [ "${ENABLE_ALARM_EVENTS}" = "true" ]; then
         echo "" >> "$CONFIG_FILE"
         echo "data-model-writes:" >> "$CONFIG_FILE"
+        
+        # Add alarm frames configuration automatically if alarm events are enabled
+        if [ "${ENABLE_ALARM_EVENTS}" = "true" ] && [ -n "${ALARM_EVENT_INSTANCE_SPACE}" ]; then
+            cat >> "$CONFIG_FILE" <<EOF
+  - topic: "events/alarms/frame"
+    instance-space: "${ALARM_EVENT_INSTANCE_SPACE}"
+    data-model-space: "${ALARM_EVENT_DATA_MODEL_SPACE}"
+    data-model-version: "${ALARM_EVENT_DATA_MODEL_VERSION}"
+    view-external-id: "haAlarmFrame"
+EOF
+            echo "[Startup 79%] Alarm frames auto-configured for events/alarms/frame -> haAlarmFrame"
+        fi
         
         # Parse the JSON array and write each entry
         echo "${DATA_MODEL_WRITES}" | python3 -c "

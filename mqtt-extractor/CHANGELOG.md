@@ -1,5 +1,11 @@
 ### Changelog
 
+**1.0.3** - 2025-12-16
+- **FIX:** Alarm frames now auto-configured when alarm events are enabled
+- Automatically adds `events/alarms/frame` topic → `haAlarmFrame` view mapping
+- No manual configuration needed - frames work out of the box with alarm events
+- Uses the same instance space, data model space, and version as alarm events
+
 **1.0.2** - 2025-12-16
 - **FIX:** Preserve dots (.) in external IDs - they are allowed by CDF
 - **FIX:** Alarm events now check if alarm definition exists before linking
