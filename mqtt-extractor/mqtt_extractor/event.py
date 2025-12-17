@@ -142,9 +142,15 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         external_id_prefix = data.get('externalIdPrefix') or data.get('external_id_prefix', '')
         alarm_definition_id = data.get('definition') or data.get('alarm_definition_id')
         message = data.get('message', '')
-        value_raw = data.get('valueRaw') or data.get('value_raw')
+        
+        # Check for value at trigger (support multiple field names)
+        value_raw = data.get('valueAtTrigger') or data.get('value_at_trigger') or data.get('valueRaw') or data.get('value_raw')
+        
+        # Check for trigger entity (support both root level and metadata)
+        trigger_entity = data.get('triggerEntity') or data.get('trigger_entity', '')
         metadata = data.get('metadata', {})
-        trigger_entity = metadata.get('triggerEntity') or metadata.get('trigger_entity', '')
+        if not trigger_entity:
+            trigger_entity = metadata.get('triggerEntity') or metadata.get('trigger_entity', '')
         
         # Log the raw data for debugging
         logger.debug(f"Raw alarm data: type={event_type}, definition={alarm_definition_id}, trigger_entity={trigger_entity}, value_raw={value_raw}")
