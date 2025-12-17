@@ -39,16 +39,31 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     
     Args:
         ext_id: The external ID to sanitize
-        prefix: Prefix to use if ID starts with number (default: "hal_")
+        prefix: Prefix to use if needed (default: "hal_")
                 - "hal_" for alarm events (Home Assistant aLarm)
                 - "had_" for alarm definitions (Home Assistant alarm Definition)
                 - "haa_" for assets/properties (Home Assistant Asset)
+                - "has_" for source systems (Home Assistant Source)
+                - "haf_" for alarm frames (Home Assistant alarm Frame)
     """
     if not ext_id:
         return ext_id
     
     # Convert to string if not already
     ext_id = str(ext_id)
+    
+    # Check if it already has the correct prefix
+    already_has_correct_prefix = ext_id.startswith(prefix)
+    
+    # Strip any existing Home Assistant prefix (including the correct one)
+    # We'll re-add the correct prefix later if needed
+    ha_prefixes = ['hal_', 'had_', 'haa_', 'has_', 'haf_', 'ha_']
+    original_had_prefix = False
+    for ha_prefix in ha_prefixes:
+        if ext_id.startswith(ha_prefix):
+            ext_id = ext_id[len(ha_prefix):]
+            original_had_prefix = True
+            break
     
     # Replace dots and other invalid characters with underscores
     # CDF allows: letters, numbers, underscores only
@@ -59,8 +74,13 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
         else:
             sanitized += '_'
     
-    # If it starts with a number, add the specified prefix
-    if sanitized[0].isdigit():
+    # Add the prefix if:
+    # 1. It starts with a number, OR
+    # 2. It had an HA prefix originally (even if it was the wrong one)
+    if sanitized and sanitized[0].isdigit():
+        sanitized = f"{prefix}{sanitized}"
+    elif original_had_prefix:
+        # It had a prefix, ensure it has the correct one
         sanitized = f"{prefix}{sanitized}"
     
     # Strip trailing underscores (CDF requires ending with letter or number)
@@ -69,10 +89,6 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     # If somehow we ended up with an empty string or all underscores, provide fallback
     if not sanitized:
         sanitized = f"{prefix}unknown"
-    
-    # Final check: ensure it starts with a letter
-    if sanitized and not sanitized[0].isalpha():
-        sanitized = f"{prefix}{sanitized}"
     
     return sanitized
 

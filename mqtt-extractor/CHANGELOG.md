@@ -1,5 +1,14 @@
 ### Changelog
 
+**0.9.3** - 2025-12-16
+- **FIX:** Prevent double-prefixing when MQTT payload already has correct prefix
+- Strip any existing HA prefix (hal_, had_, haa_, has_, haf_) before sanitization
+- Re-add the correct prefix for the entity type
+- Only add prefix if: starts with number OR already had an HA prefix
+- Allows MQTT source to provide correct prefixes without duplication
+- Example: `had_75_nsunkenmeadow_alarmdef_...` (definition) in alarm event → strips `had_`, adds `hal_`
+- Example: `hal_75_nsunkenmeadow_...` (already correct) → keeps `hal_` without duplication
+
 **0.9.2** - 2025-12-16
 - **NEW:** Type-specific prefixes for different entity types
 - Alarm events: `hal_` prefix (Home Assistant aLarm)
