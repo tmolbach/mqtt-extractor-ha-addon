@@ -1,9 +1,10 @@
 {
   "name": "MQTT Alarm Extractor for Cognite",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "slug": "mqtt-alarm-extractor",
   "description": "Extract alarm events and frames from MQTT and write to Cognite Data Fusion data model views",
   "url": "https://github.com/tmolbach/mqtt-extractor-ha-addon",
+  "logo": "logo.png",
   "arch": ["amd64", "aarch64", "armv7"],
   "startup": "application",
   "boot": "auto",

@@ -1,8 +1,9 @@
 {
   "name": "MQTT Extractor for Cognite",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "slug": "mqtt-extractor",
   "description": "Extracts MQTT messages and pushes them to Cognite Data Fusion (CDF)",
+  "logo": "logo.png",
   "arch": ["amd64", "aarch64", "armv7"],
   "startup": "application",
   "boot": "auto",
