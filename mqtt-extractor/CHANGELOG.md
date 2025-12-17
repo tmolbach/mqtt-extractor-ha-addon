@@ -1,5 +1,8 @@
 ### Changelog
 
+**1.0.7** - 2025-12-17
+- **CHANGE:** Renamed from "MQTT to Cognite Data Fusion Extractor" to "MQTT Extractor for Cognite"
+
 **1.0.6** - 2025-12-16
 - **FIX:** Actually add MQTT subscription for alarm frames topic!
 - The subscription for `events/alarms/frame` was missing
