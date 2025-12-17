@@ -74,18 +74,10 @@ class WorkflowConfig:
     debounce_window: int = 5  # Wait N seconds after last message before triggering (default 5 seconds)
 
 @dataclass
-class AlarmEventConfig:
-    instance_space: str = None
-    data_model_space: str = "sp_enterprise_schema_space"
-    data_model_version: str = "v1"
-    view_external_id: str = "haAlarmEvent"
-    source_system: str = "MQTT"
-
-@dataclass
 class DataModelWriteConfig:
     """Configuration for flexible topic-to-view mapping."""
     topic: str  # MQTT topic pattern (exact or wildcard)
-    view_external_id: str  # Target view external ID (e.g., "haAlarmEvent", "haAlarmFrame")
+    view_external_id: str  # Target view external ID
     instance_space: str  # CDF instance space for nodes
     data_model_space: str = "sp_enterprise_schema_space"
     data_model_version: str = "v1"
@@ -100,7 +92,6 @@ class Config(BaseConfig):
     status_interval: int = 60
     target: TargetConfig = None
     workflow: WorkflowConfig = None
-    alarm_events: AlarmEventConfig = None
     data_model_writes: List[DataModelWriteConfig] = None  # Flexible topic-to-view mapping
     max_datapoints: int = None  # Stop after this many datapoints (for testing)
     external_id_prefix: str = "mqtt:"  # Prefix on external ID used when creating CDF resources
@@ -117,16 +108,6 @@ def config_logging(config_file):
 
 
 _handlers = {}
-
-# Global config for alarm event handler
-alarm_event_config = {
-    'enabled': False,
-    'instance_space': None,
-    'data_model_space': 'sp_enterprise_schema_space',
-    'data_model_version': 'v1',
-    'view_external_id': 'haAlarmEvent',
-    'source_system': 'MQTT',
-}
 
 
 def mqtt_topic_matches(topic: str, pattern: str) -> bool:
@@ -496,19 +477,6 @@ def main():
                    config.workflow.external_id, config.workflow.version or "latest", 
                    config.workflow.trigger_interval, config.workflow.debounce_window)
     
-    # Configure alarm event handler if enabled
-    if config.alarm_events and config.alarm_events.instance_space:
-        global alarm_event_config
-        alarm_event_config['enabled'] = True
-        alarm_event_config['instance_space'] = config.alarm_events.instance_space
-        alarm_event_config['data_model_space'] = config.alarm_events.data_model_space
-        alarm_event_config['data_model_version'] = config.alarm_events.data_model_version
-        alarm_event_config['view_external_id'] = config.alarm_events.view_external_id
-        alarm_event_config['source_system'] = config.alarm_events.source_system
-        logger.info("Alarm event handler enabled: view=%s/%s (space=%s)", 
-                   config.alarm_events.data_model_space, config.alarm_events.view_external_id,
-                   config.alarm_events.instance_space)
-    
     # Configure flexible data model writes (topic-to-view mapping)
     if config.data_model_writes:
         from . import datamodel
@@ -549,8 +517,7 @@ def main():
         "by_handler": {  # Track messages by handler type
             "simple": 0,    # mqtt_topics (timeseries)
             "raw": 0,       # mqtt_raw_topics (CDF Raw)
-            "event": 0,     # mqtt_event_topics (alarm events)
-            "datamodel": 0, # data_model_writes (alarm frames, etc)
+            "datamodel": 0, # data_model_writes
         },
         "start_time": now(),  # Track when extractor started
     }
@@ -568,10 +535,8 @@ def main():
                 breakdown_parts.append(f"TS: {stats['by_handler']['simple']}")
             if stats["by_handler"]["raw"] > 0:
                 breakdown_parts.append(f"Raw: {stats['by_handler']['raw']}")
-            if stats["by_handler"]["event"] > 0:
-                breakdown_parts.append(f"Events: {stats['by_handler']['event']}")
             if stats["by_handler"]["datamodel"] > 0:
-                breakdown_parts.append(f"Frames: {stats['by_handler']['datamodel']}")
+                breakdown_parts.append(f"DataModel: {stats['by_handler']['datamodel']}")
             
             breakdown = " | " + ", ".join(breakdown_parts) if breakdown_parts else ""
             
@@ -706,8 +671,6 @@ def main():
                     stats["by_handler"]["simple"] += 1
                 elif 'raw' in handler_module:
                     stats["by_handler"]["raw"] += 1
-                elif 'event' in handler_module:
-                    stats["by_handler"]["event"] += 1
                 elif 'datamodel' in handler_module:
                     stats["by_handler"]["datamodel"] += 1
                 
@@ -852,7 +815,7 @@ def main():
         
         # Brief delay to allow initial connection and subscription
         time.sleep(2)
-        logger.info("🚀 Ready for events and alarms (MQTT client running in background)")
+        logger.info("🚀 Ready for MQTT messages (MQTT client running in background)")
         
         # Wait for stop signal
         try:

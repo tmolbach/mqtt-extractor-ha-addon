@@ -6,14 +6,9 @@ Supports writing to any view by routing messages based on topic patterns.
 
 Example configuration in extractor.yaml:
   data_model_writes:
-    - topic: "events/alarms/log"
-      view_external_id: "haAlarmEvent"
-      instance_space: "sp_75_nsunkenmeadow"
-      data_model_space: "sp_enterprise_schema_space"
-      data_model_version: "v1"
-    - topic: "events/alarms/frame"
-      view_external_id: "haAlarmFrame"
-      instance_space: "sp_75_nsunkenmeadow"
+    - topic: "sensors/temperature"
+      view_external_id: "haSensor"
+      instance_space: "sp_instance"
       data_model_space: "sp_enterprise_schema_space"
       data_model_version: "v1"
 """
@@ -39,12 +34,9 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     
     Args:
         ext_id: The external ID to sanitize
-        prefix: Prefix to use if needed (default: "hal_")
-                - "hal_" for alarm events (Home Assistant aLarm)
-                - "had_" for alarm definitions (Home Assistant alarm Definition)
+        prefix: Prefix to use if needed (default: "ha_")
                 - "haa_" for assets/properties (Home Assistant Asset)
                 - "has_" for source systems (Home Assistant Source)
-                - "haf_" for alarm frames (Home Assistant alarm Frame)
     """
     if not ext_id:
         return ext_id
@@ -57,7 +49,7 @@ def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
     
     # Strip any existing Home Assistant prefix (including the correct one)
     # We'll re-add the correct prefix later if needed
-    ha_prefixes = ['hal_', 'had_', 'haa_', 'has_', 'haf_', 'ha_']
+    ha_prefixes = ['haa_', 'has_', 'ha_']
     original_had_prefix = False
     for ha_prefix in ha_prefixes:
         if ext_id.startswith(ha_prefix):
@@ -168,153 +160,7 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
     
     properties = {}
     
-    # Common mappings based on view type
-    if 'AlarmEvent' in view_external_id:
-        # Map for AlarmEvent view
-        # Required from CogniteActivity: name, startTime
-        properties['name'] = data.get('name') or data.get('message') or data.get('description', 'Alarm Event')
-        properties['description'] = data.get('description') or data.get('message', '')
-        
-        # startTime (inherited from CogniteSchedulable)
-        start_time = data.get('startTime') or data.get('start_time') or data.get('timestamp')
-        if start_time:
-            properties['startTime'] = normalize_timestamp(start_time)
-        
-        # Custom AlarmEvent properties
-        if 'eventType' in data or 'event_type' in data or 'log_type' in data:
-            event_type = data.get('eventType') or data.get('event_type') or data.get('log_type')
-            # Map ALARM_START/ALARM_END to ACTIVATED/CLEARED
-            if event_type == 'ALARM_START':
-                event_type = 'ACTIVATED'
-            elif event_type == 'ALARM_END':
-                event_type = 'CLEARED'
-            properties['eventType'] = event_type
-        
-        if 'valueSnapshot' in data or 'value_snapshot' in data:
-            properties['valueSnapshot'] = str(data.get('valueSnapshot') or data.get('value_snapshot'))
-        elif 'valueAtTrigger' in data or 'value_at_trigger' in data:
-            # Also populate valueSnapshot from valueAtTrigger for compatibility
-            val = data.get('valueAtTrigger') or data.get('value_at_trigger')
-            if val is not None:
-                properties['valueSnapshot'] = str(val)
-                properties['valueAtTrigger'] = str(val)
-        
-        if 'triggerEntity' in data or 'trigger_entity' in data:
-            properties['triggerEntity'] = data.get('triggerEntity') or data.get('trigger_entity')
-        
-        # definition relationship
-        definition = data.get('definition') or data.get('alarm_definition_id')
-        if definition:
-            if isinstance(definition, str):
-                sanitized_def = sanitize_external_id(definition, prefix="had_")
-                properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
-            elif isinstance(definition, dict):
-                # Sanitize externalId if present in dict
-                if 'externalId' in definition:
-                    definition['externalId'] = sanitize_external_id(definition['externalId'], prefix="had_")
-                properties['definition'] = definition
-        
-        # Source system (CogniteSourceable)
-        # Source externalId should always be "MQTT"
-        properties['source'] = {
-            'space': instance_space,  # Source systems are in the same instance space
-            'externalId': 'MQTT'
-        }
-        
-        # Asset references
-        asset_refs = []
-        
-        # Check for 'property' field (singular asset reference)
-        if 'property' in data:
-            property_id = data.get('property')
-            if property_id:
-                sanitized_property = sanitize_external_id(property_id, prefix="haa_")
-                asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
-        
-        # Also check for 'assets' array (for backward compatibility or multiple assets)
-        assets = data.get('assets', [])
-        if assets and isinstance(assets, list):
-            for asset in assets:
-                if isinstance(asset, str):
-                    sanitized_asset = sanitize_external_id(asset, prefix="haa_")
-                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
-                elif isinstance(asset, dict):
-                    if 'externalId' in asset:
-                        asset['externalId'] = sanitize_external_id(asset['externalId'], prefix="haa_")
-                    asset_refs.append(asset)
-        
-        if asset_refs:
-            properties['assets'] = asset_refs
-        
-    elif 'AlarmFrame' in view_external_id:
-        # Map for AlarmFrame view
-        # CogniteDescribable: name, description
-        properties['name'] = data.get('name') or f"Alarm Frame {data.get('external_id', '')}"
-        properties['description'] = data.get('description', '')
-        
-        # AlarmFrame specific properties
-        start_time = data.get('startTime') or data.get('start_time')
-        if start_time:
-            properties['startTime'] = normalize_timestamp(start_time)
-        
-        end_time = data.get('endTime') or data.get('end_time')
-        if end_time:
-            properties['endTime'] = normalize_timestamp(end_time)
-        
-        duration = data.get('durationSeconds') or data.get('duration_seconds')
-        if duration is not None:
-            properties['durationSeconds'] = float(duration)
-        
-        trigger_value = data.get('triggerValue') or data.get('trigger_value')
-        if trigger_value is not None:
-            properties['triggerValue'] = str(trigger_value)
-        
-        # definition relationship
-        definition = data.get('definition') or data.get('alarm_definition_id')
-        if definition:
-            if isinstance(definition, str):
-                sanitized_def = sanitize_external_id(definition, prefix="had_")
-                properties['definition'] = {'space': instance_space, 'externalId': sanitized_def}
-            elif isinstance(definition, dict):
-                # Sanitize externalId if present in dict
-                if 'externalId' in definition:
-                    definition['externalId'] = sanitize_external_id(definition['externalId'], prefix="had_")
-                properties['definition'] = definition
-        
-        # Asset references
-        asset_refs = []
-        
-        # Check for 'property' field (singular asset reference)
-        if 'property' in data:
-            property_id = data.get('property')
-            if property_id:
-                sanitized_property = sanitize_external_id(property_id, prefix="haa_")
-                asset_refs.append({'space': instance_space, 'externalId': sanitized_property})
-        
-        # Also check for 'assets' array (for backward compatibility or multiple assets)
-        assets = data.get('assets', [])
-        if assets and isinstance(assets, list):
-            for asset in assets:
-                if isinstance(asset, str):
-                    sanitized_asset = sanitize_external_id(asset, prefix="haa_")
-                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset})
-                elif isinstance(asset, dict):
-                    # Sanitize externalId if present in dict
-                    if 'externalId' in asset:
-                        asset['externalId'] = sanitize_external_id(asset['externalId'], prefix="haa_")
-                    asset_refs.append(asset)
-        
-        if asset_refs:
-            properties['assets'] = asset_refs
-        
-        # Source system (CogniteSourceable)
-        # Source externalId should always be "MQTT"
-        properties['source'] = {
-            'space': instance_space,  # Source systems are in the same instance space
-            'externalId': 'MQTT'
-        }
-    
-    else:
+    # Generic fallback - pass through common properties
         # Generic fallback - pass through common properties
         for key, value in data.items():
             if key in ('external_id', 'externalId', 'type'):
@@ -360,10 +206,6 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             return
         
         view_external_id = view_config.get('view_external_id')
-        is_alarm_frame = 'AlarmFrame' in view_external_id or 'alarm' in topic.lower() and 'frame' in topic.lower()
-        
-        if is_alarm_frame:
-            logger.info(f"📋 Processing alarm frame from topic: {topic}")
         logger.debug(f"Found config for topic {topic}: view={view_external_id}")
         
         # Decode payload
@@ -379,20 +221,13 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Parse JSON
         try:
             data = json.loads(payload_str)
-            if is_alarm_frame:
-                logger.info(f"📋 Alarm frame JSON parsed: {json.dumps(data, indent=2)}")
-            else:
-                logger.debug(f"Parsed JSON from {topic}: {json.dumps(data, indent=2)}")
+            logger.debug(f"Parsed JSON from {topic}: {json.dumps(data, indent=2)}")
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse JSON for topic %s: %s", topic, e)
-            if is_alarm_frame:
-                logger.error(f"❌ Failed to parse alarm frame JSON!")
             return
 
         if not isinstance(data, dict):
             logger.debug("Payload is not a JSON object for topic %s, skipping", topic)
-            if is_alarm_frame:
-                logger.error(f"❌ Alarm frame payload is not a JSON object!")
             return
 
         # Get configuration values
@@ -419,21 +254,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug(f"Generated external_id: {external_id}")
         
         # Sanitize external_id to meet CDF naming requirements
-        # Use appropriate prefix based on view type
-        if 'AlarmEvent' in view_external_id:
-            prefix = "hal_"  # Home Assistant aLarm event
-        elif 'AlarmFrame' in view_external_id:
-            prefix = "haf_"  # Home Assistant alarm Frame
-        else:
-            prefix = "ha_"   # Generic Home Assistant
-        
         original_ext_id = external_id
-        external_id = sanitize_external_id(external_id, prefix=prefix)
+        external_id = sanitize_external_id(external_id, prefix="ha_")
         if external_id != original_ext_id:
-            if is_alarm_frame:
-                logger.info(f"📋 Alarm frame external_id sanitized: {original_ext_id} -> {external_id}")
-            else:
-                logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
+            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData
@@ -463,23 +287,12 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         )
 
         try:
-            if is_alarm_frame:
-                logger.info(f"📋 Sending alarm frame to CDF: {external_id}")
             result = client.data_modeling.instances.apply(nodes=[node])
-            if is_alarm_frame:
-                logger.info(f"✓ Alarm frame successfully written to CDF: {external_id}")
-            else:
-                logger.debug(f"Wrote {view_external_id}: {external_id}")
+            logger.debug(f"Wrote {view_external_id}: {external_id}")
         except Exception as e:
-            if is_alarm_frame:
-                logger.error(f"❌ Failed to write alarm frame to CDF: {e}")
-                logger.error(f"❌ Alarm frame external_id: {external_id}")
-                logger.error(f"❌ Alarm frame properties: {json.dumps(properties, indent=2, default=str)}")
-                logger.error(f"❌ Alarm frame node: space={instance_space}, view={view_external_id}")
-            else:
-                logger.error(f"Failed to write {view_external_id} to CDF: {e}")
-                logger.error(f"Failed external_id: {external_id}")
-                logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            logger.error(f"Failed to write {view_external_id} to CDF: {e}")
+            logger.error(f"Failed external_id: {external_id}")
+            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
 
     except Exception as e:
