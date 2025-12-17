@@ -546,6 +546,12 @@ def main():
         "period_datapoints": 0,
         "period_messages": 0,
         "by_topic": {},  # Track statistics per topic
+        "by_handler": {  # Track messages by handler type
+            "simple": 0,    # mqtt_topics (timeseries)
+            "raw": 0,       # mqtt_raw_topics (CDF Raw)
+            "event": 0,     # mqtt_event_topics (alarm events)
+            "datamodel": 0, # data_model_writes (alarm frames, etc)
+        },
         "start_time": now(),  # Track when extractor started
     }
     
@@ -555,9 +561,23 @@ def main():
         if elapsed > 0:
             msg_rate = stats["period_messages"] / elapsed
             dp_rate = stats["period_datapoints"] / elapsed
-            logger.info("Status: %.2f msg/s, %.2f dp/s | Total: %d topics, %d messages, %d datapoints",
+            
+            # Build breakdown of messages by handler type
+            breakdown_parts = []
+            if stats["by_handler"]["simple"] > 0:
+                breakdown_parts.append(f"TS: {stats['by_handler']['simple']}")
+            if stats["by_handler"]["raw"] > 0:
+                breakdown_parts.append(f"Raw: {stats['by_handler']['raw']}")
+            if stats["by_handler"]["event"] > 0:
+                breakdown_parts.append(f"Events: {stats['by_handler']['event']}")
+            if stats["by_handler"]["datamodel"] > 0:
+                breakdown_parts.append(f"Frames: {stats['by_handler']['datamodel']}")
+            
+            breakdown = " | " + ", ".join(breakdown_parts) if breakdown_parts else ""
+            
+            logger.info("Status: %.2f msg/s, %.2f dp/s | Total: %d topics, %d messages, %d datapoints%s",
                        msg_rate, dp_rate, stats["timeseries_discovered"], 
-                       stats["messages_received"], stats["datapoints_uploaded"])
+                       stats["messages_received"], stats["datapoints_uploaded"], breakdown)
             
             # Log per-topic statistics only for DEBUG level
             if len(stats["by_topic"]) > 1 and logger.isEnabledFor(logging.DEBUG):
@@ -679,6 +699,17 @@ def main():
                 if topic not in stats["by_topic"]:
                     stats["by_topic"][topic] = {"messages": 0, "datapoints": 0}
                 stats["by_topic"][topic]["messages"] += 1
+                
+                # Track messages by handler type
+                handler_module = handle.__module__ if hasattr(handle, '__module__') else ''
+                if 'simple' in handler_module:
+                    stats["by_handler"]["simple"] += 1
+                elif 'raw' in handler_module:
+                    stats["by_handler"]["raw"] += 1
+                elif 'event' in handler_module:
+                    stats["by_handler"]["event"] += 1
+                elif 'datamodel' in handler_module:
+                    stats["by_handler"]["datamodel"] += 1
                 
                 # Track if we got any datapoints from the handler
                 datapoints_from_message = 0

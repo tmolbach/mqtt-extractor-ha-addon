@@ -1,5 +1,11 @@
 ### Changelog
 
+**1.0.4** - 2025-12-16
+- **IMPROVED:** Status message now shows breakdown of messages by handler type
+- Shows: TS (timeseries/simple), Raw (CDF Raw), Events (alarm events), Frames (alarm frames)
+- Example: `Status: 1.50 msg/s, 1.02 dp/s | Total: 62 topics, 91 messages, 62 datapoints | TS: 50, Raw: 30, Events: 8, Frames: 3`
+- Makes it easy to see which types of messages are being processed
+
 **1.0.3** - 2025-12-16
 - **FIX:** Alarm frames now auto-configured when alarm events are enabled
 - Automatically adds `events/alarms/frame` topic → `haAlarmFrame` view mapping
