@@ -1,5 +1,15 @@
 ### Changelog
 
+**1.0.1** - 2025-12-16
+- **IMPROVED:** Added INFO-level logging for workflow triggers
+  - Shows when workflow is triggered with execution ID
+  - Shows when workflow is skipped due to minimum interval
+  - Shows when delayed workflow trigger is scheduled
+  - Uses emoji indicators for better readability (▶, ✓, ⏸, ⏰)
+- **IMPROVED:** Added "Ready for events and alarms" message after startup
+- **CLARIFIED:** MQTT processing is non-blocking - all messages (alarms, events, registry) are processed as they arrive in parallel
+- No priority handling needed - the MQTT client runs in a background thread
+
 **1.0.0** - 2025-12-16
 - **FIX:** Added mandatory `eventType` field to alarm events (ACTIVATED/CLEARED)
 - Restored full alarm event property population with all fields

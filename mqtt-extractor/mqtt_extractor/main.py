@@ -819,6 +819,10 @@ def main():
 
         client.on_message = on_message
         
+        # Brief delay to allow initial connection and subscription
+        time.sleep(2)
+        logger.info("🚀 Ready for events and alarms (MQTT client running in background)")
+        
         # Wait for stop signal
         try:
             while not stop.is_set():

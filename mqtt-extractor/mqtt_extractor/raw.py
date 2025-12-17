@@ -143,8 +143,8 @@ def _execute_workflow_trigger(client, db_name: str):
         # Check if enough time has elapsed since last actual trigger
         if time_since_last < trigger_interval:
             time_until_ready = trigger_interval - time_since_last
-            logger.info(f"Skipping immediate workflow trigger for {db_name} (last triggered {time_since_last:.1f}s ago, min_interval={trigger_interval}s)")
-            logger.info(f"Scheduling delayed workflow trigger for {db_name} in {time_until_ready:.1f}s to process these changes")
+            logger.info(f"⏸ Workflow trigger skipped for '{db_name}' (triggered {time_since_last:.0f}s ago, min interval: {trigger_interval}s)")
+            logger.info(f"⏰ Delayed workflow trigger scheduled for '{db_name}' in {time_until_ready:.0f}s")
             
             # Schedule a delayed trigger for when the interval will have elapsed
             delayed_timer = threading.Timer(time_until_ready, _execute_workflow_trigger, args=(client, db_name))
@@ -172,7 +172,7 @@ def _execute_workflow_trigger(client, db_name: str):
             'timestamp': int(current_time * 1000)
         }
         
-        logger.info(f"Triggering workflow: {external_id} (version={version}) for database: {db_name}")
+        logger.info(f"▶ Triggering workflow '{external_id}' (v{version}) for database: {db_name}")
         
         if version:
             execution = client.workflows.executions.run(
@@ -186,7 +186,7 @@ def _execute_workflow_trigger(client, db_name: str):
                 input=input_data
             )
         
-        logger.info(f"Workflow triggered successfully: execution_id={execution.id}")
+        logger.info(f"✓ Workflow execution started: {execution.id}")
         
     except Exception as e:
         logger.error(f"Failed to trigger workflow for database {db_name}: {e}")
