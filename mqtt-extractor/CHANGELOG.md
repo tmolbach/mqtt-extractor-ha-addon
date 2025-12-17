@@ -1,5 +1,15 @@
 ### Changelog
 
+**0.9.0** - 2025-12-16
+- **BREAKING CHANGE:** Removed external ID sanitization - now using MQTT payload IDs directly
+- External IDs in CDF do NOT require regex pattern matching (can contain dots, start with numbers, etc.)
+- Alarm definition IDs, asset IDs, source IDs, and event IDs all used as-is from payload
+- No more prefixing with "alarm_" or replacing dots with underscores
+- Example: `75_nsunkenmeadow_alarmdef_binary_sensor.75_la_ws03_water_leakage_sensor` used directly
+- CDF accepts any valid string as external ID (previous sanitization was unnecessary)
+- Simplifies debugging - external IDs in CDF match exactly what's in MQTT
+- Applied to both `event.py` and `datamodel.py` handlers
+
 **0.8.6** - 2025-12-16
 - **CRITICAL FIX:** Enhanced external ID sanitization to meet full CDF regex requirements
 - External IDs cannot end with underscores (must end with letter or number)

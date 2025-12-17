@@ -176,11 +176,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 # For ALARM_END, try to find the most recent open alarm
                 external_id = f"{external_id_prefix}{start_time_ms}"
         
-        # Sanitize external_id to meet CDF naming requirements
-        original_ext_id = external_id
-        external_id = sanitize_external_id(external_id)
-        if external_id != original_ext_id:
-            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
+        # Use external_id directly from payload (no sanitization needed)
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
@@ -227,12 +223,9 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         # Add reference to alarm definition if provided
         if alarm_definition_id:
-            sanitized_def_id = sanitize_external_id(alarm_definition_id)
-            if sanitized_def_id != alarm_definition_id:
-                logger.debug(f"Sanitized definition ID: {alarm_definition_id} -> {sanitized_def_id}")
             properties['definition'] = {
                 'space': instance_space,
-                'externalId': sanitized_def_id
+                'externalId': alarm_definition_id
             }
         
         # Add asset references if provided in payload
@@ -242,22 +235,19 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         if 'property' in data:
             property_id = data.get('property')
             if property_id:
-                sanitized_property_id = sanitize_external_id(property_id)
-                asset_refs.append({'space': instance_space, 'externalId': sanitized_property_id})
-                logger.debug(f"Added property as asset reference: {property_id} -> {sanitized_property_id}")
+                asset_refs.append({'space': instance_space, 'externalId': property_id})
+                logger.debug(f"Added property as asset reference: {property_id}")
         
         # Also check for 'assets' array (for backward compatibility or multiple assets)
         assets = data.get('assets', [])
         if assets and isinstance(assets, list):
             for asset in assets:
                 if isinstance(asset, str):
-                    sanitized_asset_id = sanitize_external_id(asset)
-                    asset_refs.append({'space': instance_space, 'externalId': sanitized_asset_id})
+                    asset_refs.append({'space': instance_space, 'externalId': asset})
                 elif isinstance(asset, dict) and 'externalId' in asset:
-                    sanitized_asset_id = sanitize_external_id(asset['externalId'])
                     asset_refs.append({
                         'space': asset.get('space', instance_space),
-                        'externalId': sanitized_asset_id
+                        'externalId': asset['externalId']
                     })
         
         if asset_refs:
@@ -267,13 +257,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         # Add source system reference
         # Use source from payload if provided, otherwise use config
         source_id = data.get('source') or alarm_config.get('source_system', 'MQTT')
-        sanitized_source_id = sanitize_external_id(str(source_id))
         properties['source'] = {
             'space': instance_space,
-            'externalId': sanitized_source_id
+            'externalId': str(source_id)
         }
-        if source_id != sanitized_source_id:
-            logger.debug(f"Sanitized source ID: {source_id} -> {sanitized_source_id}")
 
         # Add tags from metadata if available
         tags = []
