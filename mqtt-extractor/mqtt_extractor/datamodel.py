@@ -215,16 +215,11 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
                 properties['definition'] = definition
         
         # Source system (CogniteSourceable)
-        source = data.get('source')
-        if source:
-            if isinstance(source, str):
-                sanitized_source = sanitize_external_id(source, prefix="has_")
-                properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
-            elif isinstance(source, dict):
-                # Sanitize externalId if present in dict
-                if 'externalId' in source:
-                    source['externalId'] = sanitize_external_id(source['externalId'], prefix="has_")
-                properties['source'] = source
+        # Source externalId should always be "MQTT"
+        properties['source'] = {
+            'space': instance_space,  # Source systems are in the same instance space
+            'externalId': 'MQTT'
+        }
         
         # Asset references
         asset_refs = []
@@ -313,16 +308,11 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
             properties['assets'] = asset_refs
         
         # Source system (CogniteSourceable)
-        source = data.get('source')
-        if source:
-            if isinstance(source, str):
-                sanitized_source = sanitize_external_id(source, prefix="has_")
-                properties['source'] = {'space': instance_space, 'externalId': sanitized_source}
-            elif isinstance(source, dict):
-                # Sanitize externalId if present in dict
-                if 'externalId' in source:
-                    source['externalId'] = sanitize_external_id(source['externalId'], prefix="has_")
-                properties['source'] = source
+        # Source externalId should always be "MQTT"
+        properties['source'] = {
+            'space': instance_space,  # Source systems are in the same instance space
+            'externalId': 'MQTT'
+        }
     
     else:
         # Generic fallback - pass through common properties

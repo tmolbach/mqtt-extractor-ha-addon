@@ -1,5 +1,13 @@
 ### Changelog
 
+**0.9.4** - 2025-12-16
+- **FIX:** Source system reference now always uses `externalId: "MQTT"`
+- Source value from payload (e.g., "HomeAssistant") goes into `sourceContext` field (free-form string)
+- Source space is `instance_space` (ha_instances), not cdf_cdm
+- Ensures proper external ID sanitization is applied to alarm event IDs
+- Added INFO-level logging to show sanitized external IDs
+- Separates source system entity (MQTT) from source context value (HomeAssistant, etc.)
+
 **0.9.3** - 2025-12-16
 - **FIX:** Prevent double-prefixing when MQTT payload already has correct prefix
 - Strip any existing HA prefix (hal_, had_, haa_, has_, haf_) before sanitization

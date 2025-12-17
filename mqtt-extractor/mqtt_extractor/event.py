@@ -203,9 +203,10 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         original_ext_id = external_id
         external_id = sanitize_external_id(external_id, prefix="hal_")
         if external_id != original_ext_id:
-            logger.debug(f"Sanitized alarm event external_id: {original_ext_id} -> {external_id}")
+            logger.info(f"Sanitized alarm event external_id: {original_ext_id} -> {external_id}")
 
         logger.info(f"Processing {event_type} for alarm: {alarm_definition_id}")
+        logger.info(f"Alarm event external ID (sanitized): {external_id}")
         logger.debug(f"External ID: {external_id}, start: {start_time}, end: {end_time}")
         logger.debug(f"Full alarm event data: {json.dumps(data, indent=2, default=str)}")
 
@@ -228,10 +229,13 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
         event_name = data.get('name') or message or f"Alarm occurrence {external_id}"
         event_description = data.get('description') or (f"Alarm event from {trigger_entity}" if trigger_entity else "Alarm event")
         
+        # Use source from payload for sourceContext (free-form string)
+        source_context = data.get('source', 'MQTT')
+        
         properties = {
             'name': event_name,
             'description': event_description,
-            'sourceContext': 'MQTT',
+            'sourceContext': source_context,  # Free-form string from payload (e.g., "HomeAssistant")
             'sourceId': external_id,
             'startTime': start_time,
         }
@@ -289,16 +293,11 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug(f"Total asset references added to alarm event: {len(asset_refs)}")
 
         # Add source system reference
-        # Use source from payload if provided, otherwise use config
-        source_id = data.get('source') or alarm_config.get('source_system', 'MQTT')
-        # Source typically starts with a letter (like "HomeAssistant"), so use minimal prefix
-        sanitized_source_id = sanitize_external_id(str(source_id), prefix="has_")
+        # Source externalId should always be "MQTT" (the actual source value goes in sourceContext)
         properties['source'] = {
-            'space': instance_space,
-            'externalId': sanitized_source_id
+            'space': instance_space,  # Source systems are in the same instance space
+            'externalId': 'MQTT'
         }
-        if str(source_id) != sanitized_source_id:
-            logger.debug(f"Sanitized source ID: {source_id} -> {sanitized_source_id}")
 
         # Add tags from metadata if available
         tags = []
