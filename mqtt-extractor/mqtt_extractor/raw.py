@@ -320,15 +320,20 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 from cognite.client.data_classes import Row
                 
                 row = Row(key=row_key, columns=data)
+                # Insert synchronously - this is blocking but ensures message order and reliability
+                # If this fails, we want to know about it immediately
                 client.raw.rows.insert(safe_db_name, safe_table_name, [row])
                 logger.info(f"✓ Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
                 logger.debug(f"Row data: {json.dumps(data, default=str)[:200]}")
                 
                 # Trigger workflow if configured (throttled per database)
+                # This is async/non-blocking, so it won't interrupt message processing
                 trigger_workflow_if_needed(client, safe_db_name)
                 
             except Exception as e:
                 logger.error(f"Failed to insert row into {safe_db_name}.{safe_table_name}: {e}")
+                logger.error(f"Failed row key: {row_key}, topic: {topic}")
+                # Don't re-raise - continue processing other messages
                 
     except Exception as e:
         logger.exception("Unexpected error in raw handler for topic %s", topic)

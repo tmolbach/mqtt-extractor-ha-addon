@@ -146,10 +146,19 @@ def mqtt_topic_matches(topic: str, pattern: str) -> bool:
 
 
 def on_connect(client, userdata, flags, rc):
-    if flags.get("session present") != 1:
-        # Should have session state for QoS=1
-        logger.debug("MQTT connection without session state")
+    """Handle MQTT connection/reconnection. Re-subscribes to all topics."""
+    if rc != 0:
+        logger.error("Failed to connect to MQTT broker, return code: %d", rc)
+        return
     
+    session_present = flags.get("session present", 0)
+    if session_present != 1:
+        # Should have session state for QoS=1 with clean_session=False
+        logger.debug("MQTT connection without session state (clean session or first connect)")
+    else:
+        logger.debug("MQTT connection restored with session state")
+    
+    # Re-subscribe to all topics on (re)connection
     for subscription in config.subscriptions:
         handler = subscription.handler.handler()
         
@@ -159,8 +168,11 @@ def on_connect(client, userdata, flags, rc):
             mqtt_topic = "#"  # MQTT multi-level wildcard
         
         _handlers[mqtt_topic] = handler
-        client.subscribe(mqtt_topic, qos=subscription.qos)
-        logger.debug("Subscribed to MQTT topic: %s (qos=%d)", mqtt_topic, subscription.qos)
+        result, mid = client.subscribe(mqtt_topic, qos=subscription.qos)
+        if result == 0:
+            logger.debug("Subscribed to MQTT topic: %s (qos=%d, mid=%d)", mqtt_topic, subscription.qos, mid)
+        else:
+            logger.warning("Failed to subscribe to MQTT topic: %s (result=%d)", mqtt_topic, result)
     
     logger.info("Connected to %s:%d (%d subscriptions)", 
                config.mqtt.hostname, config.mqtt.port, len(config.subscriptions))
@@ -644,6 +656,8 @@ def main():
                 # Only track statistics for topics that match subscription filters
                 stats["messages_received"] += 1
                 stats["period_messages"] += 1
+                
+                # Process message immediately - don't defer to avoid message loss
 
                 handle = _handlers.get(message.topic)
                 matched_pattern = message.topic
@@ -800,6 +814,7 @@ def main():
                         data_model_buffer.clear()
 
                 # Periodic status logging with adaptive intervals
+                # Do this AFTER all message processing to avoid blocking
                 current_interval = get_next_status_interval()
                 if now() - stats["last_status_time"] >= current_interval:
                     log_statistics()
