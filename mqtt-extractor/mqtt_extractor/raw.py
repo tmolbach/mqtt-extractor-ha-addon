@@ -15,6 +15,13 @@ _existing_resources = {}
 _workflow_pending = {}
 _workflow_lock = threading.Lock()
 
+# Buffer for batching RAW inserts
+# Structure: {(db_name, table_name): {'rows': [Row, ...], 'last_added': timestamp, 'timer': Timer}}
+_row_buffer = {}
+_buffer_lock = threading.Lock()
+_buffer_max_size = 100  # Flush when buffer reaches this many rows
+_buffer_max_age = 1.0  # Flush after this many seconds of inactivity (for same table)
+
 # Workflow configuration - will be set by main.py
 workflow_config = {
     'enabled': False,
@@ -67,6 +74,101 @@ def ensure_db_table(client, db_name: str, table_name: str) -> bool:
     except Exception as e:
         logger.error(f"Error ensuring Raw resources {db_name}.{table_name}: {e}")
         return False
+
+
+def _flush_buffer(client, db_name: str, table_name: str):
+    """
+    Flush buffered rows for a specific database and table.
+    Called by timer or when buffer is full.
+    """
+    buffer_key = (db_name, table_name)
+    
+    with _buffer_lock:
+        if buffer_key not in _row_buffer:
+            return
+        
+        buffer_info = _row_buffer[buffer_key]
+        rows = buffer_info.get('rows', [])
+        
+        if not rows:
+            # No rows to flush, clean up
+            if buffer_info.get('timer'):
+                buffer_info['timer'].cancel()
+            del _row_buffer[buffer_key]
+            return
+        
+        # Clear buffer before releasing lock (to allow new messages to buffer)
+        _row_buffer[buffer_key] = {'rows': [], 'last_added': 0, 'timer': None}
+        timer = buffer_info.get('timer')
+        if timer:
+            timer.cancel()
+    
+    # Insert rows outside the lock to avoid blocking
+    if rows:
+        try:
+            client.raw.rows.insert(db_name, table_name, rows)
+            logger.info(f"✓ Inserted {len(rows)} rows into Raw {db_name}.{table_name} (batched)")
+            # Trigger workflow if configured
+            trigger_workflow_if_needed(client, db_name)
+        except Exception as e:
+            logger.error(f"Failed to insert {len(rows)} rows into {db_name}.{table_name}: {e}")
+            logger.error(f"Failed rows keys: {[r.key for r in rows[:5]]}")  # Show first 5 keys
+            logger.debug("Full traceback:", exc_info=True)
+
+
+def _add_to_buffer(client, db_name: str, table_name: str, row):
+    """
+    Add a row to the buffer and flush if needed.
+    """
+    buffer_key = (db_name, table_name)
+    current_time = time.time()
+    
+    with _buffer_lock:
+        if buffer_key not in _row_buffer:
+            _row_buffer[buffer_key] = {'rows': [], 'last_added': 0, 'timer': None}
+        
+        buffer_info = _row_buffer[buffer_key]
+        buffer_info['rows'].append(row)
+        buffer_info['last_added'] = current_time
+        
+        row_count = len(buffer_info['rows'])
+        
+        # Flush if buffer is full
+        if row_count >= _buffer_max_size:
+            # Cancel timer since we're flushing now
+            if buffer_info.get('timer'):
+                buffer_info['timer'].cancel()
+                buffer_info['timer'] = None
+            
+            # Get rows and clear buffer
+            rows_to_flush = buffer_info['rows'][:]
+            buffer_info['rows'] = []
+            
+            # Release lock before flushing
+            threading.Thread(
+                target=_flush_buffer,
+                args=(client, db_name, table_name),
+                daemon=True
+            ).start()
+            
+            # Insert immediately in this thread
+            try:
+                client.raw.rows.insert(db_name, table_name, rows_to_flush)
+                logger.info(f"✓ Inserted {len(rows_to_flush)} rows into Raw {db_name}.{table_name} (buffer full)")
+                trigger_workflow_if_needed(client, db_name)
+            except Exception as e:
+                logger.error(f"Failed to insert {len(rows_to_flush)} rows into {db_name}.{table_name}: {e}")
+                logger.debug("Full traceback:", exc_info=True)
+        
+        # Schedule flush timer if not already scheduled
+        elif not buffer_info.get('timer'):
+            def flush_callback():
+                _flush_buffer(client, db_name, table_name)
+            
+            timer = threading.Timer(_buffer_max_age, flush_callback)
+            timer.daemon = True
+            buffer_info['timer'] = timer
+            timer.start()
 
 
 def trigger_workflow_if_needed(client, db_name: str):
@@ -320,18 +422,14 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
                 from cognite.client.data_classes import Row
                 
                 row = Row(key=row_key, columns=data)
-                # Insert synchronously - this is blocking but ensures message order and reliability
-                # If this fails, we want to know about it immediately
-                client.raw.rows.insert(safe_db_name, safe_table_name, [row])
-                logger.info(f"✓ Inserted row into Raw {safe_db_name}.{safe_table_name} with key {row_key}")
-                logger.debug(f"Row data: {json.dumps(data, default=str)[:200]}")
+                logger.debug(f"Buffering row for Raw {safe_db_name}.{safe_table_name} with key {row_key}")
                 
-                # Trigger workflow if configured (throttled per database)
-                # This is async/non-blocking, so it won't interrupt message processing
-                trigger_workflow_if_needed(client, safe_db_name)
+                # Add to buffer - will be flushed when buffer is full or after timeout
+                # This batches inserts for efficiency while maintaining low latency
+                _add_to_buffer(client, safe_db_name, safe_table_name, row)
                 
             except Exception as e:
-                logger.error(f"Failed to insert row into {safe_db_name}.{safe_table_name}: {e}")
+                logger.error(f"Failed to buffer row for {safe_db_name}.{safe_table_name}: {e}")
                 logger.error(f"Failed row key: {row_key}, topic: {topic}")
                 # Don't re-raise - continue processing other messages
                 
