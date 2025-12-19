@@ -133,22 +133,41 @@ def write_record_to_cdf(
             logger.debug(f"  Could not serialize record for logging: {log_err}")
         
         # Write to CDF Records API
+        logger.debug(f"Writing record to stream: {stream_external_id}")
         response = client.post(
             url=f"/api/v1/projects/{client.config.project}/streams/{stream_external_id}/records",
             json={"items": [record]}
         )
         
-        # Check response status
-        if response.status_code in [200, 201]:
-            logger.debug(f"Written to CDF Records successfully: {external_id}")
+        logger.debug(f"Response status: {response.status_code}")
+        logger.debug(f"Response headers: {dict(response.headers) if hasattr(response, 'headers') else 'N/A'}")
+        
+        # Check response status - 200 (OK), 201 (Created), and 202 (Accepted) are all success codes
+        if response.status_code in [200, 201, 202]:
+            logger.debug(f"Written to CDF Records successfully: {external_id} (HTTP {response.status_code})")
+            # Log response body if available for debugging
+            try:
+                if hasattr(response, 'json'):
+                    response_body = response.json()
+                    logger.debug(f"Response body: {response_body}")
+                elif hasattr(response, 'text') and response.text:
+                    logger.debug(f"Response text: {response.text}")
+            except Exception as e:
+                logger.debug(f"Could not parse response body: {e}")
             return True
         else:
             logger.error(f"Failed to write record to CDF: HTTP {response.status_code}")
             try:
-                error_body = response.json() if hasattr(response, 'json') else response.text
-                logger.error(f"  Error response: {error_body}")
-            except Exception:
-                logger.error(f"  Error response: {response.text if hasattr(response, 'text') else 'Unable to parse'}")
+                if hasattr(response, 'json'):
+                    error_body = response.json()
+                    logger.error(f"  Error response: {error_body}")
+                elif hasattr(response, 'text'):
+                    logger.error(f"  Error response text: {response.text}")
+                else:
+                    logger.error(f"  Error response: {response}")
+            except Exception as e:
+                logger.error(f"  Could not parse error response: {e}")
+                logger.error(f"  Raw response: {response}")
             return False
         
     except Exception as e:
