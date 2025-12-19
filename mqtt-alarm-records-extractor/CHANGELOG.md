@@ -2,6 +2,12 @@
 
 All notable changes to the Alarm Extractor to Records for Cognite add-on will be documented in this file.
 
+## [1.0.2] - 2025-01-XX
+
+### Fixed
+- Accept HTTP 202 (Accepted) as success status for Records API writes
+- Fixed regression where HTTP 202 responses were incorrectly treated as errors
+
 ## [1.0.1] - 2025-01-XX
 
 ### Changed

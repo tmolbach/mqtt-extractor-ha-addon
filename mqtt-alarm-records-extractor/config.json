@@ -1,6 +1,6 @@
 {
   "name": "Alarm Extractor to Records for Cognite",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "slug": "mqtt-alarm-records-extractor",
   "description": "Extract alarm events and frames from MQTT and write to Cognite Data Fusion Records",
   "url": "https://github.com/tmolbach/mqtt-extractor-ha-addon",

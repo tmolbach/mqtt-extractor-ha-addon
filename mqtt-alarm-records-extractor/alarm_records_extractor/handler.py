@@ -138,8 +138,8 @@ def write_record_to_cdf(
             json={"items": [record]}
         )
         
-        # Check response status
-        if response.status_code in [200, 201]:
+        # Check response status - 200 (OK), 201 (Created), and 202 (Accepted) are all success codes
+        if response.status_code in [200, 201, 202]:
             logger.debug(f"Written to CDF Records successfully: {external_id}")
             return True
         else:
