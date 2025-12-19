@@ -2,6 +2,13 @@
 
 All notable changes to the Alarm Extractor to Records for Cognite add-on will be documented in this file.
 
+## [1.0.1] - 2025-01-XX
+
+### Changed
+- Simplified logging and error handling in handler
+- Removed verbose debug logging for cleaner output
+- Improved error response handling
+
 ## [1.0.0] - 2025-12-18
 
 ### Added
