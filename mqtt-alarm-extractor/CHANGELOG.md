@@ -2,6 +2,16 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.14] - 2025-01-XX
+
+### Fixed
+- Add buffering mechanism for AlarmEvents that reference non-existent AlarmFrames
+- Events are automatically buffered when their referenced frame doesn't exist yet
+- Buffered events are retried automatically when the corresponding AlarmFrame is written
+- Prevents "Cannot auto-create a direct relation target" errors when events arrive before frames
+- Added timeout mechanism (5 minutes) to prevent indefinite buffering
+- Improved statistics tracking with buffered/retried event counts
+
 ## [1.0.13] - 2025-01-XX
 
 ### Changed
