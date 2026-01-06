@@ -2,6 +2,13 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.13] - 2025-01-XX
+
+### Changed
+- Update default data model version from v1 to v2.0.12
+- Support for AlarmEvent to AlarmFrame linking via `frameExternalId` property
+- The `transform_payload` function automatically converts `frameExternalId` → `frame` direct relation
+
 ## [1.0.10] - 2025-12-17
 
 ### Fixed

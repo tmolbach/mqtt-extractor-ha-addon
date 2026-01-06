@@ -1,6 +1,6 @@
 {
   "name": "MQTT Alarm Extractor for Cognite",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "slug": "mqtt-alarm-extractor",
   "description": "Extract alarm events and frames from MQTT and write to Cognite Data Fusion data model views",
   "url": "https://github.com/tmolbach/mqtt-extractor-ha-addon",
@@ -24,7 +24,7 @@
     "mqtt_qos": 1,
     "instance_space": "ha_instances",
     "data_model_space": "sp_enterprise_schema_space",
-    "data_model_version": "v1",
+    "data_model_version": "v2.0.12",
     "alarm_event_topic": "events/alarms/log",
     "alarm_event_view": "haAlarmEvent",
     "alarm_frame_topic": "events/alarms/frame",

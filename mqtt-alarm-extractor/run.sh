@@ -40,7 +40,7 @@ MQTT_QOS=$(get_config 'mqtt_qos' '1')
 
 INSTANCE_SPACE=$(get_config 'instance_space' 'ha_instances')
 DATA_MODEL_SPACE=$(get_config 'data_model_space' 'sp_enterprise_schema_space')
-DATA_MODEL_VERSION=$(get_config 'data_model_version' 'v1')
+DATA_MODEL_VERSION=$(get_config 'data_model_version' 'v2.0.12')
 
 ALARM_EVENT_TOPIC=$(get_config 'alarm_event_topic' 'events/alarms/log')
 ALARM_EVENT_VIEW=$(get_config 'alarm_event_view' 'haAlarmEvent')
