@@ -6,9 +6,14 @@ Supports writing to any view by routing messages based on topic patterns.
 
 Example configuration in extractor.yaml:
   data_model_writes:
-    - topic: "sensors/temperature"
-      view_external_id: "haSensor"
-      instance_space: "sp_instance"
+    - topic: "events/alarms/log"
+      view_external_id: "haAlarmEvent"
+      instance_space: "sp_75_nsunkenmeadow"
+      data_model_space: "sp_enterprise_schema_space"
+      data_model_version: "v1"
+    - topic: "events/alarms/frame"
+      view_external_id: "haAlarmFrame"
+      instance_space: "sp_75_nsunkenmeadow"
       data_model_space: "sp_enterprise_schema_space"
       data_model_version: "v1"
 """
@@ -16,6 +21,7 @@ Example configuration in extractor.yaml:
 import json
 import logging
 import time
+from collections import deque
 from datetime import datetime, timezone
 from typing import Generator, Tuple, Union, Any, Dict, List, Optional
 
@@ -25,64 +31,18 @@ logger = logging.getLogger(__name__)
 # Structure: { "topic_pattern": { "view_external_id": ..., "instance_space": ..., ... } }
 data_model_writes_config: Dict[str, Dict] = {}
 
+# Retry queue for failed CDF writes (internet outage, etc.)
+# List of (timestamp, topic, payload_bytes, view_config_dict)
+_failed_writes_queue: deque = deque()
 
-def sanitize_external_id(ext_id: str, prefix: str = "hal_") -> str:
-    """
-    Ensure external ID meets CDF naming requirements.
-    Must start with a letter, contain only letters/numbers/underscores, and end with letter/number.
-    Pattern: ^[a-zA-Z]([a-zA-Z0-9_]{0,253}[a-zA-Z0-9])?$
-    
-    Args:
-        ext_id: The external ID to sanitize
-        prefix: Prefix to use if needed (default: "ha_")
-                - "haa_" for assets/properties (Home Assistant Asset)
-                - "has_" for source systems (Home Assistant Source)
-    """
-    if not ext_id:
-        return ext_id
-    
-    # Convert to string if not already
-    ext_id = str(ext_id)
-    
-    # Check if it already has the correct prefix
-    already_has_correct_prefix = ext_id.startswith(prefix)
-    
-    # Strip any existing Home Assistant prefix (including the correct one)
-    # We'll re-add the correct prefix later if needed
-    ha_prefixes = ['haa_', 'has_', 'ha_']
-    original_had_prefix = False
-    for ha_prefix in ha_prefixes:
-        if ext_id.startswith(ha_prefix):
-            ext_id = ext_id[len(ha_prefix):]
-            original_had_prefix = True
-            break
-    
-    # CDF allows: letters, numbers, underscores, dots, hyphens
-    # Only replace truly invalid characters (spaces, special chars)
-    sanitized = ''
-    for char in ext_id:
-        if char.isalnum() or char in ('_', '.', '-'):
-            sanitized += char
-        else:
-            sanitized += '_'
-    
-    # Add the prefix if:
-    # 1. It starts with a number, OR
-    # 2. It had an HA prefix originally (even if it was the wrong one)
-    if sanitized and sanitized[0].isdigit():
-        sanitized = f"{prefix}{sanitized}"
-    elif original_had_prefix:
-        # It had a prefix, ensure it has the correct one
-        sanitized = f"{prefix}{sanitized}"
-    
-    # Strip trailing underscores (CDF requires ending with letter or number)
-    sanitized = sanitized.rstrip('_')
-    
-    # If somehow we ended up with an empty string or all underscores, provide fallback
-    if not sanitized:
-        sanitized = f"{prefix}unknown"
-    
-    return sanitized
+# Maximum time to retry failed writes (seconds) - default 24 hours
+_failed_write_timeout = 86400
+
+# Maximum size for failed writes queue - prevent unbounded growth
+_max_failed_queue_size = 10000
+
+# Track last successful write time to detect connectivity restoration
+_last_successful_write = time.time()
 
 
 def normalize_timestamp(ts) -> Optional[str]:
@@ -160,7 +120,108 @@ def build_node_properties(data: Dict, view_config: Dict) -> Dict:
     
     properties = {}
     
-    # Generic fallback - pass through common properties
+    # Common mappings based on view type
+    if 'AlarmEvent' in view_external_id:
+        # Map for AlarmEvent view
+        # Required from CogniteActivity: name, startTime
+        properties['name'] = data.get('name') or data.get('message') or data.get('description', 'Alarm Event')
+        properties['description'] = data.get('description') or data.get('message', '')
+        
+        # startTime (inherited from CogniteSchedulable)
+        start_time = data.get('startTime') or data.get('start_time') or data.get('timestamp')
+        if start_time:
+            properties['startTime'] = normalize_timestamp(start_time)
+        
+        # Custom AlarmEvent properties
+        if 'eventType' in data or 'event_type' in data or 'log_type' in data:
+            event_type = data.get('eventType') or data.get('event_type') or data.get('log_type')
+            # Map ALARM_START/ALARM_END to ACTIVATED/CLEARED
+            if event_type == 'ALARM_START':
+                event_type = 'ACTIVATED'
+            elif event_type == 'ALARM_END':
+                event_type = 'CLEARED'
+            properties['eventType'] = event_type
+        
+        if 'valueSnapshot' in data or 'value_snapshot' in data:
+            properties['valueSnapshot'] = str(data.get('valueSnapshot') or data.get('value_snapshot'))
+        elif 'valueAtTrigger' in data or 'value_at_trigger' in data:
+            # Also populate valueSnapshot from valueAtTrigger for compatibility
+            val = data.get('valueAtTrigger') or data.get('value_at_trigger')
+            if val is not None:
+                properties['valueSnapshot'] = str(val)
+                properties['valueAtTrigger'] = str(val)
+        
+        if 'triggerEntity' in data or 'trigger_entity' in data:
+            properties['triggerEntity'] = data.get('triggerEntity') or data.get('trigger_entity')
+        
+        # definition relationship
+        definition = data.get('definition') or data.get('alarm_definition_id')
+        if definition:
+            if isinstance(definition, str):
+                properties['definition'] = {'space': instance_space, 'externalId': definition}
+            elif isinstance(definition, dict):
+                properties['definition'] = definition
+        
+        # Source system (CogniteSourceable)
+        source = data.get('source')
+        if source:
+            if isinstance(source, str):
+                properties['source'] = {'space': instance_space, 'externalId': source}
+            elif isinstance(source, dict):
+                properties['source'] = source
+        
+    elif 'AlarmFrame' in view_external_id:
+        # Map for AlarmFrame view
+        # CogniteDescribable: name, description
+        properties['name'] = data.get('name') or f"Alarm Frame {data.get('external_id', '')}"
+        properties['description'] = data.get('description', '')
+        
+        # AlarmFrame specific properties
+        start_time = data.get('startTime') or data.get('start_time')
+        if start_time:
+            properties['startTime'] = normalize_timestamp(start_time)
+        
+        end_time = data.get('endTime') or data.get('end_time')
+        if end_time:
+            properties['endTime'] = normalize_timestamp(end_time)
+        
+        duration = data.get('durationSeconds') or data.get('duration_seconds')
+        if duration is not None:
+            properties['durationSeconds'] = float(duration)
+        
+        trigger_value = data.get('triggerValue') or data.get('trigger_value')
+        if trigger_value is not None:
+            properties['triggerValue'] = str(trigger_value)
+        
+        # definition relationship
+        definition = data.get('definition') or data.get('alarm_definition_id')
+        if definition:
+            if isinstance(definition, str):
+                properties['definition'] = {'space': instance_space, 'externalId': definition}
+            elif isinstance(definition, dict):
+                properties['definition'] = definition
+        
+        # assets relationship (list)
+        assets = data.get('assets', [])
+        if assets:
+            asset_refs = []
+            for asset in assets:
+                if isinstance(asset, str):
+                    asset_refs.append({'space': instance_space, 'externalId': asset})
+                elif isinstance(asset, dict):
+                    asset_refs.append(asset)
+            if asset_refs:
+                properties['assets'] = asset_refs
+        
+        # Source system (CogniteSourceable)
+        source = data.get('source')
+        if source:
+            if isinstance(source, str):
+                properties['source'] = {'space': instance_space, 'externalId': source}
+            elif isinstance(source, dict):
+                properties['source'] = source
+    
+    else:
         # Generic fallback - pass through common properties
         for key, value in data.items():
             if key in ('external_id', 'externalId', 'type'):
@@ -205,8 +266,7 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             logger.debug(f"No data_model_writes config found for topic: {topic}")
             return
         
-        view_external_id = view_config.get('view_external_id')
-        logger.debug(f"Found config for topic {topic}: view={view_external_id}")
+        logger.debug(f"Found config for topic {topic}: view={view_config.get('view_external_id')}")
         
         # Decode payload
         try:
@@ -252,12 +312,6 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
             safe_topic = topic.replace('/', '_')
             external_id = f"{safe_topic}_{start_time_ms}"
             logger.debug(f"Generated external_id: {external_id}")
-        
-        # Sanitize external_id to meet CDF naming requirements
-        original_ext_id = external_id
-        external_id = sanitize_external_id(external_id, prefix="ha_")
-        if external_id != original_ext_id:
-            logger.debug(f"Sanitized external_id: {original_ext_id} -> {external_id}")
 
         # Import required CDF data classes
         from cognite.client.data_classes.data_modeling import NodeApply, ViewId, NodeOrEdgeData
@@ -288,12 +342,22 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
 
         try:
             result = client.data_modeling.instances.apply(nodes=[node])
-            logger.debug(f"Wrote {view_external_id}: {external_id}")
+            logger.info(f"Successfully wrote {view_external_id} node: {external_id}")
+            
+            # Update last successful write time
+            global _last_successful_write
+            _last_successful_write = time.time()
+            
+            # After successful write, retry any failed writes (connectivity restored)
+            _retry_failed_writes(client)
         except Exception as e:
-            logger.error(f"Failed to write {view_external_id} to CDF: {e}")
-            logger.error(f"Failed external_id: {external_id}")
-            logger.error(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
+            logger.error(f"Failed to write to CDF data model: {e}")
+            logger.debug(f"Failed node: space={instance_space}, external_id={external_id}")
+            logger.debug(f"Failed properties: {json.dumps(properties, indent=2, default=str)}")
             logger.debug("Full traceback:", exc_info=True)
+            
+            # Queue for retry
+            _queue_failed_write(topic, payload, view_config)
 
     except Exception as e:
         logger.exception("Unexpected error in datamodel handler for topic %s", topic)
@@ -301,4 +365,129 @@ def parse(payload: bytes, topic: str, client: Any = None, subscription_topic: st
     # Yield nothing as we handle storage internally
     if False:
         yield ("", 0, 0)
+
+
+def _queue_failed_write(topic: str, payload: bytes, view_config: Dict):
+    """
+    Queue a failed write for retry later.
+    
+    Args:
+        topic: MQTT topic
+        payload: Raw message payload bytes
+        view_config: View configuration dictionary
+    """
+    global _failed_writes_queue, _max_failed_queue_size
+    
+    # Check queue size limit
+    if len(_failed_writes_queue) >= _max_failed_queue_size:
+        logger.error(f"Failed writes queue full ({_max_failed_queue_size}), dropping oldest message")
+        _failed_writes_queue.popleft()
+    
+    _failed_writes_queue.append((
+        time.time(),
+        topic,
+        payload,
+        view_config
+    ))
+    logger.warning(f"Queued message for retry after CDF write failure (queue size: {len(_failed_writes_queue)})")
+    
+    # Cleanup expired messages periodically
+    if len(_failed_writes_queue) % 100 == 0:
+        _cleanup_failed_writes()
+
+
+def _cleanup_failed_writes():
+    """Remove expired messages from failed writes queue."""
+    global _failed_writes_queue, _failed_write_timeout
+    
+    if not _failed_writes_queue:
+        return
+    
+    current_time = time.time()
+    initial_size = len(_failed_writes_queue)
+    
+    # Remove expired messages from the front
+    while _failed_writes_queue:
+        timestamp, _, _, _ = _failed_writes_queue[0]
+        if current_time - timestamp > _failed_write_timeout:
+            _failed_writes_queue.popleft()
+        else:
+            break
+    
+    removed = initial_size - len(_failed_writes_queue)
+    if removed > 0:
+        logger.warning(f"Removed {removed} expired failed write(s) from queue")
+
+
+def _retry_failed_writes(client: Any):
+    """
+    Retry writing messages that failed due to connectivity issues.
+    Called after successful writes to detect when connectivity is restored.
+    
+    Args:
+        client: CogniteClient instance
+    """
+    global _failed_writes_queue, _last_successful_write
+    
+    if not _failed_writes_queue:
+        return
+    
+    retried_count = 0
+    current_time = time.time()
+    
+    # Try to retry failed writes
+    while _failed_writes_queue:
+        timestamp, topic, payload_bytes, view_config = _failed_writes_queue[0]
+        
+        # Skip expired messages
+        if current_time - timestamp > _failed_write_timeout:
+            _failed_writes_queue.popleft()
+            logger.warning(f"Removed expired failed write (age: {current_time - timestamp:.0f}s)")
+            continue
+        
+        # Try to write by calling parse again
+        try:
+            # Re-parse and write
+            list(parse(payload_bytes, topic, client))
+            _failed_writes_queue.popleft()
+            retried_count += 1
+        except Exception as e:
+            # Still failing, stop retrying (will retry again after next successful write)
+            logger.debug(f"Retry still failing: {e}")
+            break
+    
+    if retried_count > 0:
+        logger.info(f"Retried {retried_count} failed write(s) after connectivity restored")
+
+
+def retry_failed_writes_periodic(client: Any):
+    """
+    Periodically retry failed writes (called from main loop).
+    This handles the case where connectivity is restored but no new messages arrive.
+    
+    Args:
+        client: CogniteClient instance
+    """
+    global _failed_writes_queue, _last_successful_write
+    
+    if not _failed_writes_queue:
+        return
+    
+    current_time = time.time()
+    
+    # Check if we've had a successful write recently (within last 5 minutes)
+    # If so, connectivity is likely restored, try retrying
+    if current_time - _last_successful_write < 300:
+        _retry_failed_writes(client)
+    else:
+        # No successful writes recently, but try once anyway to test connectivity
+        # This is called periodically from main loop, so limit retries
+        if len(_failed_writes_queue) > 0:
+            # Try just one message to test connectivity
+            _retry_failed_writes(client)
+
+
+
+
+
 

@@ -2,6 +2,19 @@
 
 All notable changes to the MQTT Alarm Extractor for Cognite will be documented in this file.
 
+## [1.0.15] - 2025-01-XX
+
+### Added
+- Retry queue mechanism for failed CDF writes during internet outages
+- Messages that fail to write to CDF are automatically queued for retry
+- Automatic retry when connectivity is restored (detected after successful writes)
+- Periodic retry attempts even when no new messages arrive
+- Queue size limit (10,000 messages) and timeout (24 hours) to prevent unbounded growth
+- Statistics tracking for failed and retried writes
+
+### Changed
+- Update default data model version from v2.0.12 to v2.0.13
+
 ## [1.0.14] - 2025-01-XX
 
 ### Fixed

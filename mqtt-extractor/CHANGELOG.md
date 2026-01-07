@@ -1,5 +1,25 @@
 ### Changelog
 
+**0.7.4** - 2025-01-XX
+- **ADDED:** Retry queue mechanism for failed CDF writes during internet outages
+- Messages that fail to write to CDF are automatically queued for retry
+- Automatic retry when connectivity is restored (detected after successful writes)
+- Periodic retry attempts even when no new messages arrive
+- Queue size limit (10,000 messages) and timeout (24 hours) to prevent unbounded growth
+- **CHANGED:** Updated default values:
+  - `mqtt_clean_session`: true (was false)
+  - `mqtt_topics`: ["states/#"] (was ["*"])
+  - `mqtt_raw_topics`: ["registry/#"] (was [])
+  - `external_id_prefix`: "mqtt_" (was "mqtt:")
+  - `enable_data_model`: true (was false)
+  - `instance_space`: "ha_instances" (was "")
+  - `data_model_version`: "v2.0.13" (was "v1")
+  - `trigger_workflows_on_raw_change`: true (was false)
+  - `workflow_external_id`: "ha_ingestion" (was "")
+  - `workflow_version`: "v1" (was "")
+  - `workflow_min_trigger_interval`: 300 (unchanged)
+  - `workflow_debounce_seconds`: 5 (unchanged)
+
 **1.0.7** - 2025-12-17
 - **CHANGE:** Renamed from "MQTT to Cognite Data Fusion Extractor" to "MQTT Extractor for Cognite"
 

@@ -217,8 +217,21 @@ class AlarmHandler:
         # Key: frame_external_id, Value: deque of (timestamp, topic, payload_bytes, view_external_id)
         self.pending_events: Dict[str, deque] = {}
         
+        # Queue for failed CDF writes (internet outage, etc.)
+        # List of (timestamp, topic, payload_bytes, view_external_id)
+        self.failed_writes_queue: deque = deque()
+        
         # Maximum time to buffer an event (seconds) - default 5 minutes
         self.buffer_timeout = 300
+        
+        # Maximum time to retry failed writes (seconds) - default 24 hours
+        self.failed_write_timeout = 86400
+        
+        # Maximum size for failed writes queue - prevent unbounded growth
+        self.max_failed_queue_size = 10000
+        
+        # Track last successful write time to detect connectivity restoration
+        self.last_successful_write = time.time()
         
         # Statistics
         self.stats = {
@@ -228,7 +241,9 @@ class AlarmHandler:
             'frames_written': 0,
             'errors': 0,
             'events_buffered': 0,
-            'events_retried': 0
+            'events_retried': 0,
+            'writes_failed': 0,
+            'writes_retried': 0
         }
     
     def _node_exists(self, external_id: str) -> bool:
@@ -286,6 +301,62 @@ class AlarmHandler:
         for frame_external_id in frames_to_remove:
             del self.pending_events[frame_external_id]
     
+    def _retry_failed_writes(self):
+        """
+        Retry writing messages that failed due to connectivity issues.
+        Called after successful writes to detect when connectivity is restored.
+        """
+        if not self.failed_writes_queue:
+            return
+        
+        retried_count = 0
+        current_time = time.time()
+        
+        # Try to retry failed writes
+        while self.failed_writes_queue:
+            timestamp, topic, payload_bytes, view_external_id = self.failed_writes_queue[0]
+            
+            # Skip expired messages
+            if current_time - timestamp > self.failed_write_timeout:
+                self.failed_writes_queue.popleft()
+                logger.warning(f"Removed expired failed write (age: {current_time - timestamp:.0f}s)")
+                continue
+            
+            # Try to write
+            logger.debug(f"Retrying failed write for {view_external_id} from {topic}")
+            success = self._write_event_directly(topic, payload_bytes, view_external_id)
+            
+            if success:
+                self.failed_writes_queue.popleft()
+                retried_count += 1
+                self.stats['writes_retried'] += 1
+            else:
+                # Still failing, stop retrying (will retry again after next successful write)
+                break
+        
+        if retried_count > 0:
+            logger.info(f"Retried {retried_count} failed write(s) after connectivity restored")
+    
+    def _cleanup_failed_writes(self):
+        """Remove expired messages from failed writes queue."""
+        if not self.failed_writes_queue:
+            return
+        
+        current_time = time.time()
+        initial_size = len(self.failed_writes_queue)
+        
+        # Remove expired messages from the front
+        while self.failed_writes_queue:
+            timestamp, _, _, _ = self.failed_writes_queue[0]
+            if current_time - timestamp > self.failed_write_timeout:
+                self.failed_writes_queue.popleft()
+            else:
+                break
+        
+        removed = initial_size - len(self.failed_writes_queue)
+        if removed > 0:
+            logger.warning(f"Removed {removed} expired failed write(s) from queue")
+    
     def _retry_pending_events_for_frame(self, frame_external_id: str):
         """
         Retry writing events that were buffered waiting for this frame.
@@ -323,6 +394,33 @@ class AlarmHandler:
         
         if retried_count > 0:
             logger.info(f"Retried {retried_count} buffered event(s) after frame {frame_external_id} was written")
+    
+    def _queue_failed_write(self, topic: str, payload_bytes: bytes, view_external_id: str):
+        """
+        Queue a failed write for retry later.
+        
+        Args:
+            topic: MQTT topic
+            payload_bytes: Raw message payload bytes
+            view_external_id: Target CDF view external ID
+        """
+        # Check queue size limit
+        if len(self.failed_writes_queue) >= self.max_failed_queue_size:
+            logger.error(f"Failed writes queue full ({self.max_failed_queue_size}), dropping oldest message")
+            self.failed_writes_queue.popleft()
+        
+        self.failed_writes_queue.append((
+            time.time(),
+            topic,
+            payload_bytes,
+            view_external_id
+        ))
+        self.stats['writes_failed'] += 1
+        logger.warning(f"Queued message for retry after CDF write failure (queue size: {len(self.failed_writes_queue)})")
+        
+        # Cleanup expired messages periodically
+        if len(self.failed_writes_queue) % 100 == 0:
+            self._cleanup_failed_writes()
     
     def _write_event_directly(self, topic: str, payload_bytes: bytes, view_external_id: str) -> bool:
         """
@@ -420,6 +518,9 @@ class AlarmHandler:
                 )
                 
                 if success:
+                    # Update last successful write time
+                    self.last_successful_write = time.time()
+                    
                     if is_event:
                         self.stats['events_written'] += 1
                     elif is_frame:
@@ -430,8 +531,13 @@ class AlarmHandler:
                         if frame_external_id:
                             self._retry_pending_events_for_frame(frame_external_id)
                     
+                    # After successful write, retry any failed writes (connectivity restored)
+                    self._retry_failed_writes()
+                    
                     return True
                 else:
+                    # Write failed - queue for retry
+                    self._queue_failed_write(topic, payload_bytes, view_external_id)
                     self.stats['errors'] += 1
                     return False
             except RuntimeError as write_error:
@@ -461,8 +567,9 @@ class AlarmHandler:
                         
                         return True  # Consider buffered as "handled"
                 
-                # Other errors - log and count as error
+                # Other errors - queue for retry
                 logger.error(f"Failed to write {view_external_id} to CDF: {write_error}")
+                self._queue_failed_write(topic, payload_bytes, view_external_id)
                 self.stats['errors'] += 1
                 return False
                 
@@ -484,6 +591,8 @@ class AlarmHandler:
             f"Frames: {self.stats['frames_written']}/{self.stats['frames_received']} | "
             f"Errors: {self.stats['errors']} | "
             f"Buffered: {buffered_count} | "
-            f"Retried: {self.stats['events_retried']}"
+            f"Retried: {self.stats['events_retried']} | "
+            f"Failed Writes: {len(self.failed_writes_queue)} | "
+            f"Retried Writes: {self.stats['writes_retried']}"
         )
 

@@ -193,11 +193,25 @@ class MQTTAlarmExtractor:
         # Process the message
         self.handler.process_message(topic, msg.payload, view)
         
-        # Periodic stats logging
+        # Periodic stats logging and retry failed writes
         now = time.time()
         if now - self.last_stats_time >= self.stats_interval:
             logger.debug(f"Stats: {self.handler.get_stats_summary()}")
             self.last_stats_time = now
+            
+            # Periodically retry failed writes (even if no new successful writes)
+            # This handles the case where connectivity is restored but no new messages arrive
+            if self.handler.failed_writes_queue:
+                # Check if we've had a successful write recently (within last 5 minutes)
+                # If so, connectivity is likely restored, try retrying
+                if now - self.handler.last_successful_write < 300:
+                    self.handler._retry_failed_writes()
+                else:
+                    # No successful writes recently, but try once anyway to test connectivity
+                    # Limit to one attempt per stats interval to avoid spam
+                    if not hasattr(self, '_last_retry_attempt') or now - self._last_retry_attempt >= self.stats_interval:
+                        self.handler._retry_failed_writes()
+                        self._last_retry_attempt = now
     
     def start(self):
         """Start the extractor."""

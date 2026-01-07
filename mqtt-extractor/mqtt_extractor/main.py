@@ -74,10 +74,18 @@ class WorkflowConfig:
     debounce_window: int = 5  # Wait N seconds after last message before triggering (default 5 seconds)
 
 @dataclass
+class AlarmEventConfig:
+    instance_space: str = None
+    data_model_space: str = "sp_enterprise_schema_space"
+    data_model_version: str = "v1"
+    view_external_id: str = "haAlarmEvent"
+    source_system: str = "MQTT"
+
+@dataclass
 class DataModelWriteConfig:
     """Configuration for flexible topic-to-view mapping."""
     topic: str  # MQTT topic pattern (exact or wildcard)
-    view_external_id: str  # Target view external ID
+    view_external_id: str  # Target view external ID (e.g., "haAlarmEvent", "haAlarmFrame")
     instance_space: str  # CDF instance space for nodes
     data_model_space: str = "sp_enterprise_schema_space"
     data_model_version: str = "v1"
@@ -92,6 +100,7 @@ class Config(BaseConfig):
     status_interval: int = 60
     target: TargetConfig = None
     workflow: WorkflowConfig = None
+    alarm_events: AlarmEventConfig = None
     data_model_writes: List[DataModelWriteConfig] = None  # Flexible topic-to-view mapping
     max_datapoints: int = None  # Stop after this many datapoints (for testing)
     external_id_prefix: str = "mqtt:"  # Prefix on external ID used when creating CDF resources
@@ -108,6 +117,16 @@ def config_logging(config_file):
 
 
 _handlers = {}
+
+# Global config for alarm event handler
+alarm_event_config = {
+    'enabled': False,
+    'instance_space': None,
+    'data_model_space': 'sp_enterprise_schema_space',
+    'data_model_version': 'v1',
+    'view_external_id': 'haAlarmEvent',
+    'source_system': 'MQTT',
+}
 
 
 def mqtt_topic_matches(topic: str, pattern: str) -> bool:
@@ -146,19 +165,10 @@ def mqtt_topic_matches(topic: str, pattern: str) -> bool:
 
 
 def on_connect(client, userdata, flags, rc):
-    """Handle MQTT connection/reconnection. Re-subscribes to all topics."""
-    if rc != 0:
-        logger.error("Failed to connect to MQTT broker, return code: %d", rc)
-        return
+    if flags.get("session present") != 1:
+        # Should have session state for QoS=1
+        logger.debug("MQTT connection without session state")
     
-    session_present = flags.get("session present", 0)
-    if session_present != 1:
-        # Should have session state for QoS=1 with clean_session=False
-        logger.debug("MQTT connection without session state (clean session or first connect)")
-    else:
-        logger.debug("MQTT connection restored with session state")
-    
-    # Re-subscribe to all topics on (re)connection
     for subscription in config.subscriptions:
         handler = subscription.handler.handler()
         
@@ -168,11 +178,8 @@ def on_connect(client, userdata, flags, rc):
             mqtt_topic = "#"  # MQTT multi-level wildcard
         
         _handlers[mqtt_topic] = handler
-        result, mid = client.subscribe(mqtt_topic, qos=subscription.qos)
-        if result == 0:
-            logger.debug("Subscribed to MQTT topic: %s (qos=%d, mid=%d)", mqtt_topic, subscription.qos, mid)
-        else:
-            logger.warning("Failed to subscribe to MQTT topic: %s (result=%d)", mqtt_topic, result)
+        client.subscribe(mqtt_topic, qos=subscription.qos)
+        logger.debug("Subscribed to MQTT topic: %s (qos=%d)", mqtt_topic, subscription.qos)
     
     logger.info("Connected to %s:%d (%d subscriptions)", 
                config.mqtt.hostname, config.mqtt.port, len(config.subscriptions))
@@ -489,6 +496,19 @@ def main():
                    config.workflow.external_id, config.workflow.version or "latest", 
                    config.workflow.trigger_interval, config.workflow.debounce_window)
     
+    # Configure alarm event handler if enabled
+    if config.alarm_events and config.alarm_events.instance_space:
+        global alarm_event_config
+        alarm_event_config['enabled'] = True
+        alarm_event_config['instance_space'] = config.alarm_events.instance_space
+        alarm_event_config['data_model_space'] = config.alarm_events.data_model_space
+        alarm_event_config['data_model_version'] = config.alarm_events.data_model_version
+        alarm_event_config['view_external_id'] = config.alarm_events.view_external_id
+        alarm_event_config['source_system'] = config.alarm_events.source_system
+        logger.info("Alarm event handler enabled: view=%s/%s (space=%s)", 
+                   config.alarm_events.data_model_space, config.alarm_events.view_external_id,
+                   config.alarm_events.instance_space)
+    
     # Configure flexible data model writes (topic-to-view mapping)
     if config.data_model_writes:
         from . import datamodel
@@ -526,11 +546,6 @@ def main():
         "period_datapoints": 0,
         "period_messages": 0,
         "by_topic": {},  # Track statistics per topic
-        "by_handler": {  # Track messages by handler type
-            "simple": 0,    # mqtt_topics (timeseries)
-            "raw": 0,       # mqtt_raw_topics (CDF Raw)
-            "datamodel": 0, # data_model_writes
-        },
         "start_time": now(),  # Track when extractor started
     }
     
@@ -540,21 +555,9 @@ def main():
         if elapsed > 0:
             msg_rate = stats["period_messages"] / elapsed
             dp_rate = stats["period_datapoints"] / elapsed
-            
-            # Build breakdown of messages by handler type
-            breakdown_parts = []
-            if stats["by_handler"]["simple"] > 0:
-                breakdown_parts.append(f"TS: {stats['by_handler']['simple']}")
-            if stats["by_handler"]["raw"] > 0:
-                breakdown_parts.append(f"Raw: {stats['by_handler']['raw']}")
-            if stats["by_handler"]["datamodel"] > 0:
-                breakdown_parts.append(f"DataModel: {stats['by_handler']['datamodel']}")
-            
-            breakdown = " | " + ", ".join(breakdown_parts) if breakdown_parts else ""
-            
-            logger.info("Status: %.2f msg/s, %.2f dp/s | Total: %d topics, %d messages, %d datapoints%s",
+            logger.info("Status: %.2f msg/s, %.2f dp/s | Total: %d topics, %d messages, %d datapoints",
                        msg_rate, dp_rate, stats["timeseries_discovered"], 
-                       stats["messages_received"], stats["datapoints_uploaded"], breakdown)
+                       stats["messages_received"], stats["datapoints_uploaded"])
             
             # Log per-topic statistics only for DEBUG level
             if len(stats["by_topic"]) > 1 and logger.isEnabledFor(logging.DEBUG):
@@ -656,8 +659,6 @@ def main():
                 # Only track statistics for topics that match subscription filters
                 stats["messages_received"] += 1
                 stats["period_messages"] += 1
-                
-                # Process message immediately - don't defer to avoid message loss
 
                 handle = _handlers.get(message.topic)
                 matched_pattern = message.topic
@@ -667,7 +668,7 @@ def main():
                         if mqtt_topic_matches(message.topic, pattern):
                             handle = handler
                             matched_pattern = pattern
-                            logger.debug("Matched: %s -> %s", message.topic, pattern)
+                            logger.info("Matched: %s -> %s", message.topic, pattern)
                             break
                     
                     if not handle:
@@ -678,15 +679,6 @@ def main():
                 if topic not in stats["by_topic"]:
                     stats["by_topic"][topic] = {"messages": 0, "datapoints": 0}
                 stats["by_topic"][topic]["messages"] += 1
-                
-                # Track messages by handler type
-                handler_module = handle.__module__ if hasattr(handle, '__module__') else ''
-                if 'simple' in handler_module:
-                    stats["by_handler"]["simple"] += 1
-                elif 'raw' in handler_module:
-                    stats["by_handler"]["raw"] += 1
-                elif 'datamodel' in handler_module:
-                    stats["by_handler"]["datamodel"] += 1
                 
                 # Track if we got any datapoints from the handler
                 datapoints_from_message = 0
@@ -727,26 +719,6 @@ def main():
 
                     # Add to TS upload queue
                     if time_stamp is not None and value is not None:
-                        # Convert boolean to int (True->1, False->0)
-                        # Note: bool is a subclass of int in Python, so check for bool explicitly first
-                        if isinstance(value, bool):
-                            logger.debug("Converting boolean to int for %s: %r -> %d", external_id, value, int(value))
-                            value = int(value)
-                        
-                        # Validate that value is numeric
-                        if not isinstance(value, (int, float)):
-                            logger.warning("Skipping non-numeric value for %s: value=%r (type=%s)", 
-                                         external_id, value, type(value).__name__)
-                            continue
-                        
-                        # Additional validation: check for NaN and infinity
-                        if isinstance(value, float):
-                            import math
-                            if math.isnan(value) or math.isinf(value):
-                                logger.warning("Skipping invalid float value for %s: value=%r", 
-                                             external_id, value)
-                                continue
-                        
                         # When using data models, we need to use instance_id with NodeId
                         if config.target and config.target.instance_space:
                             # Buffer data points for data model time series
@@ -804,20 +776,19 @@ def main():
                             data_model_buffer.clear()
                     except Exception as e:
                         logger.error("Failed to upload datapoints to data model: %s", e)
-                        # Log the failed items for debugging
-                        for item in to_insert:
-                            ext_id = item["instance_id"].external_id
-                            logger.error("  Failed item: %s with %d datapoints", ext_id, len(item["datapoints"]))
-                            for ts, val in item["datapoints"][:3]:  # Show first 3 datapoints
-                                logger.error("    -> ts=%d, value=%r (type=%s)", ts, val, type(val).__name__)
                         logger.debug("Full traceback:", exc_info=True)
                         data_model_buffer.clear()
 
                 # Periodic status logging with adaptive intervals
-                # Do this AFTER all message processing to avoid blocking
                 current_interval = get_next_status_interval()
                 if now() - stats["last_status_time"] >= current_interval:
                     log_statistics()
+                    # Periodically retry failed writes (even if no new successful writes)
+                    try:
+                        from .datamodel import retry_failed_writes_periodic
+                        retry_failed_writes_periodic(cdf_client)
+                    except Exception as e:
+                        logger.debug(f"Error retrying failed writes: {e}")
                 
                 metrics.messages.inc()
                 metrics.message_time_stamp.set(message_time_stamp)
@@ -828,14 +799,23 @@ def main():
 
         client.on_message = on_message
         
-        # Brief delay to allow initial connection and subscription
-        time.sleep(2)
-        logger.info("🚀 Ready for MQTT messages (MQTT client running in background)")
-        
-        # Wait for stop signal
+        # Wait for stop signal and periodically retry failed writes
         try:
+            last_retry_time = time.time()
+            retry_interval = 60  # Retry every 60 seconds
+            
             while not stop.is_set():
                 stop.wait(timeout=1.0)
+                
+                # Periodically retry failed writes
+                current_time = time.time()
+                if current_time - last_retry_time >= retry_interval:
+                    try:
+                        from .datamodel import retry_failed_writes_periodic
+                        retry_failed_writes_periodic(cdf_client)
+                    except Exception as e:
+                        logger.debug(f"Error retrying failed writes: {e}")
+                    last_retry_time = current_time
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received")
             stop.set()
